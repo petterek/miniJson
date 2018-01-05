@@ -2,6 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IncludeSymbols>True</IncludeSymbols>
+    <Authors>PEtter</Authors>
+    <Company>Simployer</Company>
+    <Description>Super simple JSON implementation</Description>
+    <PackageReleaseNotes></PackageReleaseNotes>
+    <AssemblyVersion>1.0.*</AssemblyVersion>
+    <Deterministic>False</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
   </PropertyGroup>
 
 </Project>
