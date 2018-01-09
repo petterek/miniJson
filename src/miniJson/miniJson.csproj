@@ -7,7 +7,7 @@
     <Authors>PEtter</Authors>
     <Company>Simployer</Company>
     <Description>Super simple JSON implementation</Description>
-    <PackageReleaseNotes></PackageReleaseNotes>
+    <PackageReleaseNotes>3996468 Master</PackageReleaseNotes>
     <AssemblyVersion>1.0.*</AssemblyVersion>
     <Deterministic>False</Deterministic>
   </PropertyGroup>

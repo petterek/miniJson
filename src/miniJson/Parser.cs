@@ -38,11 +38,9 @@ namespace miniJson
 
 		}
 
-		public static object StringToObject(StreamReader input, Type type)
+		public static object StringToObject(System.IO.Stream input, Type type)
 		{
-
-			return StringToObject(new ReadStream(input), type);
-
+			return StringToObject(new ReadStream(new StreamReader( input)), type);
 		}
 		/// <summary>
 		/// This is the main function to parse the incomming stream of bytes. 

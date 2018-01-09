@@ -156,8 +156,8 @@ namespace miniJson
 
         private static void CreateAttributeValue(IReader nextChar, ref object result, string name)
         {
-
-            var key = $"{result.GetType().FullName}-{name}";
+            Type resultType = result.GetType();
+            var key = $"{resultType.FullName}-{name}";
 
             if (!parserCache.ContainsKey(key))
             {
@@ -170,17 +170,17 @@ namespace miniJson
                         Type parserType = null;
                         MemberInfo fInfo = null;
 
-                        MemberInfo[] memberInfo = result.GetType().GetMember(name);
+                        MemberInfo[] memberInfo = resultType.GetMember(name);
                         if (memberInfo.Length != 0)
                         {
                             fInfo = memberInfo[0];
                             if (fInfo.MemberType == MemberTypes.Property)
                             {
-                                fType = result.GetType().GetProperty(name).PropertyType;
+                                fType = resultType.GetProperty(name).PropertyType;
                             }
                             else
                             {
-                                fType = result.GetType().GetField(name).FieldType;
+                                fType = resultType.GetField(name).FieldType;
                             }
                         }
 
@@ -188,7 +188,7 @@ namespace miniJson
                         if (fType.IsEnum) { parserType = typeof(EnumParser); }
                         if (fType.IsGenericType && object.ReferenceEquals(fType.GetGenericTypeDefinition(), typeof(Nullable<>))) { parserType = typeof(NullableParser); }
 
-                        parserCache.Add(key, (parserType, fType, fInfo, SetterCreator.CreateSetter(fInfo)));
+                        parserCache.Add(key, (parserType, fType, fInfo, SetterCreator.CreateValueTypeSetter(fInfo)));
                     }
                 }
             }
@@ -199,7 +199,15 @@ namespace miniJson
 
             if (info.field != null)
             {
-                result = info.setter(result, value);
+                if (resultType.IsValueType)
+                {
+
+                    result = info.setter(result, value);
+                }else
+                {
+                    info.setter(result, value);
+                }
+                
             }
 
 

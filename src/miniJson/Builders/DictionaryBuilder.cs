@@ -1,3 +1,4 @@
+using miniJson.Exceptions;
 using miniJson.Stream;
 using System;
 using System.Collections;
@@ -5,7 +6,7 @@ using System.Linq;
 
 namespace miniJson.Builders
 {
-	internal class DictionaryBuilder : Builder
+    internal class DictionaryBuilder : Builder
 	{
 
 
@@ -49,10 +50,5 @@ namespace miniJson.Builders
 
 			return res;
 		}
-	}
-
-	internal class UnsupportedDictionaryException : Exception
-	{
-
 	}
 }
