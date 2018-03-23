@@ -371,20 +371,21 @@ Imports NUnit.Framework
     End Sub
 
 
-    <Test> Public Sub ObjectWithGuidDoesNotFaile()
+    <Test> Public Sub ObjectIlistPropertyDoesNotFail()
 
-        Dim inp = "[{""Id"":""00cc7820-b6e4-4473-93e6-c3645b92bdd2""}]"
+        Dim inp = "[{""Id"":""00cc7820-b6e4-4473-93e6-c3645b92bdd2"",""Mails"" :[{""PersonId"":1}]}]"
 
-        Dim res = miniJson.Parser.StringToObject(Of List(Of Identifier))(inp)
+        Dim res = miniJson.Parser.StringToObject(Of List(Of ClassWithEnumerable))(inp)
 
         Assert.AreEqual(New Guid("00cc7820-b6e4-4473-93e6-c3645b92bdd2"), res(0).Id)
-
-
+        Assert.AreEqual(1, res(0).Mails.Count)
+        Assert.AreEqual(1, res(0).Mails(0).PersonId)
     End Sub
 End Class
 
-Public Class Identifier
+Public Class ClassWithEnumerable
     Public Id As Guid
+    Public Mails As IList(Of DataObject.Mail)
 End Class
 
 Public Class GetByIdAndNodeIdResponse
