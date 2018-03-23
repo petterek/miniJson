@@ -360,7 +360,41 @@ Imports NUnit.Framework
         Public A As String
         Public B As Integer
     End Class
+
+
+    <Test> Public Sub EdgeCaseFromPawel()
+
+        Dim inp = "{""Actions"":[],""SettingId"":""93Dea120-e62f-48ee-8837-d10a9aee6a8c"",""NodeId"":""c65904cf-c85a-49cc-b8f2-4445Dee941be"",""NodeName"":""Sjokoladefabrikken As"",""Value"":""1""}"
+        miniJson.Parser.StringToObject(Of GetByIdAndNodeIdResponse)(inp)
+
+
+    End Sub
+
+
+    <Test> Public Sub ObjectWithGuidDoesNotFaile()
+
+        Dim inp = "[{""Id"":""00cc7820-b6e4-4473-93e6-c3645b92bdd2""}]"
+
+        Dim res = miniJson.Parser.StringToObject(Of List(Of Identifier))(inp)
+
+        Assert.AreEqual(New Guid("00cc7820-b6e4-4473-93e6-c3645b92bdd2"), res(0).Id)
+
+
+    End Sub
 End Class
+
+Public Class Identifier
+    Public Id As Guid
+End Class
+
+Public Class GetByIdAndNodeIdResponse
+    Public Actions As List(Of String)
+    Public SettingId As Guid
+    Public NodeId As Guid
+    Public NodeName As String
+    Public Value As String
+End Class
+
 
 Public Class DataObject
 

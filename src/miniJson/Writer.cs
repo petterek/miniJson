@@ -27,20 +27,19 @@ namespace miniJson
             return new StreamReader(result.BaseStream).ReadToEnd();
         }
 
+
+        private static MethodInfo writeToStreamMethodInfo = typeof(StreamWriter).GetMethod("Write", new Type[] { typeof(string) });
+        private static MethodInfo writeValueMethodInfo = typeof(Writer).GetMethod("WriteValue", BindingFlags.NonPublic | BindingFlags.Static);
+
         static Action<StreamWriter, object> Serializer(Type objType)
         {
 
             List<Expression> exprns = new List<Expression>();
-
-            var writer = Expression.Parameter(typeof(StreamWriter), "writer");
-            var writeToStreamMethodInfo = typeof(StreamWriter).GetMethod("Write", new Type[] { typeof(string) });
-            var valueObject = Expression.Parameter(typeof(object), "theObject");
-
-            var writeValueMethodInfo = typeof(Writer).GetMethod("WriteValue", BindingFlags.NonPublic | BindingFlags.Static);
+            var writer = Expression.Parameter(typeof(StreamWriter));
+            var valueObject = Expression.Parameter(typeof(object));
 
             exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant("{")));
             bool first = true;
-
 
 
             if (AddTypeInfoForObjects)
@@ -64,10 +63,37 @@ namespace miniJson
                     exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant(",")));
                 }
                 first = false;
-                exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant((char)0x22 + m.Name + (char)0x22 + ":")));
-                var memberValue = Expression.PropertyOrField(Expression.Convert(valueObject, objType), m.Name);
 
+
+
+                Expression memberValue = null;
+                if (m.MemberType == MemberTypes.Property)
+                {
+                    PropertyInfo propInfo = null;
+                    foreach(var p in m.DeclaringType.GetProperties())
+                    {
+                        if (p.Name == m.Name)
+                        {
+                            propInfo = p;
+                            break;
+                        }
+                    }
+                    memberValue = Expression.Property(Expression.Convert(valueObject, objType), propInfo);
+                }
+                else
+                {
+                    memberValue = Expression.Field(Expression.Convert(valueObject, objType), m.Name);
+                }
+
+
+                exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant((char)0x22 + m.Name + (char)0x22 + ":")));
                 exprns.Add(Expression.Call(null, writeValueMethodInfo, writer, Expression.Convert(memberValue, typeof(object))));
+
+
+                //      var expr2 = Expression.Lambda(Expression.Call(
+                //      Expression.Convert(Expression.PropertyOrField(Expression.Constant(parent), "Data"), typeof(ICollection<>).MakeGenericType(parent.Data.GetType().GetGenericArguments()))
+                //, "Clear", null, null), null);
+
             }
 
             exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant("}")));
@@ -144,7 +170,7 @@ namespace miniJson
         {
             return t.GetType().FullName;
         }
-        
+
         delegate void MyWriter(StreamWriter writer, object value);
 
 
