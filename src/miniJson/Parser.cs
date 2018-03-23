@@ -56,19 +56,23 @@ namespace miniJson
 
 
 
-			//we are trying to create something that is an interface. The we must guess what to create :) 
-			//This should boil down to IEnumerable of something.. :) 
-			if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>))) {
-				builder = new ArrayBuilder();
-			} else if (typeof(IList).IsAssignableFrom(type)) {
-				builder = new ArrayBuilder();
-			} else if (typeof(IDictionary).IsAssignableFrom(type)) {
-				builder = new DictionaryBuilder();
-			} else if (typeof(ICollection).IsAssignableFrom(type)) {
-				builder = new ArrayBuilder();
-			} else {
-				builder = new ObjectBuilder();
-			}
+            //we are trying to create something that is an interface. The we must guess what to create :) 
+            //This should boil down to IEnumerable of something.. :) 
+            if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>))) {
+                builder = new ArrayBuilder();
+            } else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IList<>)))
+            {
+                builder = new ArrayBuilder();
+            }
+            else if (typeof(IList).IsAssignableFrom(type)) {
+                builder = new ArrayBuilder();
+            } else if (typeof(IDictionary).IsAssignableFrom(type)) {
+                builder = new DictionaryBuilder();
+            } else if (typeof(ICollection).IsAssignableFrom(type)) {
+                builder = new ArrayBuilder();
+            } else {
+                builder = new ObjectBuilder();
+            }
 
 
 			return builder.Parse(input, type);
