@@ -324,6 +324,13 @@ End Module
 
 
 
+    <Test> Public Sub GenericOverrideThrowsAmbiguousMatchException()
+        Dim obj = New NotificationObject(Of String) With {.ViewData = "Test"}
+        Assert.DoesNotThrow(Sub() Writer.ObjectToString(obj))
+    End Sub
+
+
+
     Public Class MyObj
         Public Property SourceTicketId As Guid = New Guid("d877c090-1fad-4f95-b2a9-22648787f2b4")
         Public Property AccountId As Guid = New Guid("c983068f-04e9-402a-acee-0ec9c6995178")
@@ -336,6 +343,16 @@ End Module
 
 End Class
 
+
+Public Class NotificationObject(Of TViewData)
+    Inherits NotificationObject
+
+    Public Shadows Property ViewData As TViewData
+End Class
+
+Public Class NotificationObject
+    Public Property ViewData As Object
+End Class
 
 
 Public Class ClassWithNullable
