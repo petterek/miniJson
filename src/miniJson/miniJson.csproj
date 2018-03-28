@@ -6,11 +6,8 @@
     <IncludeSymbols>True</IncludeSymbols>
     <Authors>PEtter</Authors>
     <Company>Simployer</Company>
-    <Description>Super simple JSON implementation</Description>
-    <PackageReleaseNotes>3996468 Master</PackageReleaseNotes>
-    <AssemblyVersion>1.0.2.0</AssemblyVersion>
-    <Deterministic>False</Deterministic>
-    <Version>1.0.2</Version>
+    <Description>Super simple JSON implementation</Description> 
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
