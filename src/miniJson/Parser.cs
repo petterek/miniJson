@@ -38,10 +38,20 @@ namespace miniJson
 
 		}
 
-		public static object StringToObject(System.IO.Stream input, Type type)
+        public static T StringToObject<T>(System.IO.Stream input) where T : new()
+        {
+
+            return (T)StringToObject(new ReadStream(new StreamReader( input, System.Text.Encoding.UTF8)), typeof(T));
+
+        }
+
+        public static object StringToObject(System.IO.Stream input, Type type)
 		{
 			return StringToObject(new ReadStream(new StreamReader( input)), type);
 		}
+
+
+
 		/// <summary>
 		/// This is the main function to parse the incomming stream of bytes. 
 		/// It is important that the types is checked in the correct order. 
