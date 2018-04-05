@@ -3,25 +3,38 @@ using System;
 
 namespace miniJson.Builders
 {
-	 class ObjectBuilder : Builder
-	{
+    class ObjectBuilder : Builder
+    {
 
 
-		public override object Parse(IReader nextChar, Type t)
-		{
-			TokenAcceptors.WhiteSpace(nextChar);
+        public override object Parse(IReader nextChar, Type t)
+        {
+            TokenAcceptors.WhiteSpace(nextChar);
 
-			if (TokenAcceptors.StartObjectOrNull(nextChar) == null) {
-				return null;
-			}
+            if (TokenAcceptors.StartObjectOrNull(nextChar) == null)
+            {
+                return null;
+            }
 
-			var Result = Activator.CreateInstance(t);
+            var Result = Activator.CreateInstance(t);
 
-			TokenAcceptors.Attributes(ref Result, nextChar);
+            TokenAcceptors.Attributes(ref Result, nextChar);
 
-			TokenAcceptors.EatUntil(TokenAcceptors.ObjectEnd, nextChar);
+            TokenAcceptors.EatUntil(TokenAcceptors.ObjectEnd, nextChar);
 
-			return Result;
-		}
-	}
+            return Result;
+        }
+    }
+
+    class ValueTypeBuilder : Builder
+    {
+
+
+        public override object Parse(IReader nextChar, Type t)
+        {
+            TokenAcceptors.WhiteSpace(nextChar);
+            return TokenAcceptors.ParseValue(t, nextChar);
+
+        }
+    }
 }

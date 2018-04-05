@@ -217,6 +217,13 @@ Imports NUnit.Framework
 
     End Sub
 
+    <Test> Public Sub DeSerializingValueTypesIsOk()
+
+        Assert.AreEqual(1, miniJson.Parser.StringToObject(Of Integer)("1"))
+        Assert.AreEqual("En to tre", miniJson.Parser.StringToObject("""En to tre""", GetType(String)))
+
+    End Sub
+
 
     <Test> Public Sub DeserializeEnums()
 
