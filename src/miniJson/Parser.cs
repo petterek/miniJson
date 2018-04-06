@@ -68,7 +68,22 @@ namespace miniJson
 
             //we are trying to create something that is an interface. The we must guess what to create :) 
             //This should boil down to IEnumerable of something.. :) 
-            if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>))) {
+            if(type.IsValueType )
+            {
+                if (type.IsPrimitive)
+                {
+                    builder = new ValueTypeBuilder();
+                }else
+                {
+                    builder = new ObjectBuilder();
+                }
+                    
+            }
+            else if (type == typeof(string))
+            {
+                builder = new ValueTypeBuilder();
+            }
+            else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>))) {
                 builder = new ArrayBuilder();
             } else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IList<>)))
             {
