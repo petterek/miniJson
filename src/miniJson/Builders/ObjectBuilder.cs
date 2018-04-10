@@ -3,10 +3,8 @@ using System;
 
 namespace miniJson.Builders
 {
-    class ObjectBuilder : Builder
+    internal class ObjectBuilder : Builder
     {
-
-
         public override object Parse(IReader nextChar, Type t)
         {
             TokenAcceptors.WhiteSpace(nextChar);
@@ -23,18 +21,6 @@ namespace miniJson.Builders
             TokenAcceptors.EatUntil(TokenAcceptors.ObjectEnd, nextChar);
 
             return Result;
-        }
-    }
-
-    class ValueTypeBuilder : Builder
-    {
-
-
-        public override object Parse(IReader nextChar, Type t)
-        {
-            TokenAcceptors.WhiteSpace(nextChar);
-            return TokenAcceptors.ParseValue(t, nextChar);
-
         }
     }
 }

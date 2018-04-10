@@ -4,20 +4,20 @@ using System;
 
 namespace miniJson.Parsers
 {
-	 class BoolanParser : Builder
-	{
+    internal class BoolanParser : Builder
+    {
+        public override object Parse(IReader nextChar, Type t)
+        {
+            TokenAcceptors.WhiteSpace(nextChar);
+            TokenAcceptors.BufferLegalCharacters(nextChar, "TtrueFfals");
+            var bufferVal = nextChar.Buffer;
 
-		public override object Parse(IReader nextChar, Type t)
-		{
-			TokenAcceptors.WhiteSpace(nextChar);
-			TokenAcceptors.BufferLegalCharacters(nextChar, "TtrueFfals");
-			var bufferVal = nextChar.Buffer;
-
-			bool res;
-			if (!bool.TryParse(bufferVal,out res)) {
-				throw new InvalidCastException(bufferVal + " is not a boolean. True/False");
-			}
-			return res;
-		}
-	}
+            bool res;
+            if (!bool.TryParse(bufferVal, out res))
+            {
+                throw new InvalidCastException(bufferVal + " is not a boolean. True/False");
+            }
+            return res;
+        }
+    }
 }

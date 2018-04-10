@@ -1,15 +1,12 @@
 using miniJson.Builders;
-using miniJson.Parsers;
 using miniJson.Stream;
 using System;
 using System.Collections.Generic;
 
 namespace miniJson.Parsers
 {
-     class UnknownFieldParser : Builder
+    internal class UnknownFieldParser : Builder
     {
-
-
         public override object Parse(IReader nextChar, Type t)
         {
             TokenAcceptors.WhiteSpace(nextChar);
@@ -20,9 +17,10 @@ namespace miniJson.Parsers
             switch ((int)peek)
             {
                 case 34:
-                    //This is a " start of string pass on to stringparser... 
+                    //This is a " start of string pass on to stringparser...
                     value = TokenAcceptors.TypeParserMapper[typeof(string)].Parse(nextChar, typeof(string));
                     break;
+
                 case 45:
                 case 46:
                 case 48:
@@ -38,6 +36,7 @@ namespace miniJson.Parsers
                     //This is a number of some kind..
                     value = TokenAcceptors.TypeParserMapper[typeof(long)].Parse(nextChar, typeof(double));
                     break;
+
                 case 70:
                 case 84:
                 case 116:
@@ -45,6 +44,7 @@ namespace miniJson.Parsers
                     // T, F, t, f -> boolean
                     value = TokenAcceptors.TypeParserMapper[typeof(bool)].Parse(nextChar, typeof(BoolanParser));
                     break;
+
                 case 44:
                     value = null;
                     break;
@@ -67,10 +67,7 @@ namespace miniJson.Parsers
             }
 
             return value;
-
         }
-
-
 
         private void PushPopStack(IReader nextChar, char start, Stack<char> stack)
         {
@@ -79,7 +76,7 @@ namespace miniJson.Parsers
 
             char endToken = ']';
             char currToken;
-            
+
             if ((start == '{'))
                 endToken = '}';
 

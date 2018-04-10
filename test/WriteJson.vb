@@ -2,13 +2,13 @@
 Imports System.Runtime.Serialization
 Imports NUnit.Framework
 
-
 Module StringExtension
+
     <Extension()> Public Sub Deserialize(obj As String)
         Dim i = 0
     End Sub
-End Module
 
+End Module
 
 <TestFixture> Public Class WriteJson
 
@@ -21,7 +21,6 @@ End Module
         Assert.AreEqual("{""ToTest"":1}", Writer.ObjectToString(New With {.ToTest = 1}))
 
     End Sub
-
 
     <Test> Public Sub ParseStringWithObjectToString()
         Dim testString = <![CDATA[<h3>{0}</h3>
@@ -71,7 +70,7 @@ End Module
         TestCase("WithChr""34"" ")
         > Public Sub TextIsWritten(input As String)
 
-        Dim value = New EncodingTest With {.toTest = input, .Test = input}
+        Dim value = New EncodingTest With {.ToTest = input, .test = input}
         Dim res = Writer.ObjectToString(value)
 
         Dim toTest As EncodingTest = Nothing
@@ -82,16 +81,17 @@ End Module
         Assert.AreEqual(value.test, toTest.test)
 
     End Sub
+
     Public Class EncodingTest
         Public ToTest As String
         Public test As String
     End Class
 
-
     Public Class BoolTest
         Public ThisIsTrue As Boolean
         Public ThisIsFalse As Boolean
     End Class
+
     <Test> Public Sub BooleanIsWritten()
         Dim o = New BoolTest With {.ThisIsTrue = True, .ThisIsFalse = False}
         Dim o2 As BoolTest = Nothing
@@ -102,8 +102,6 @@ End Module
         Assert.AreEqual(o.ThisIsFalse, o2.ThisIsFalse)
         Assert.AreEqual(o.ThisIsTrue, o2.ThisIsTrue)
     End Sub
-
-
 
     <Test,
         TestCase(1),
@@ -135,7 +133,6 @@ End Module
         Assert.IsTrue(Writer.ObjectToString(o).Contains("""Year"":12"))
     End Sub
 
-
     <Test> Public Sub MultilevelObjectsWithStructure()
         Dim o = New With {.ToTest = "", .Child = New Test With {.Name = "jklj", .Year = 12}}
         'Assert.AreEqual(Newtonsoft.Json.JsonConvert.SerializeObject(o), Writer.ObjectToString(o))
@@ -148,7 +145,6 @@ End Module
         Assert.AreEqual(Newtonsoft.Json.JsonConvert.SerializeObject(toWrite), Writer.ObjectToString(toWrite))
 
     End Sub
-
 
     <Test> Public Sub IgnoredAttributesIsNotSerialized()
 
@@ -179,9 +175,11 @@ End Module
     End Sub
 
     Public Class PetterJson
+
         Public Shared Function Format(val As String) As String
             Return "TEST CONFIG"
         End Function
+
     End Class
 
     <Test> Public Sub DateAttributesIsWrittenToText()
@@ -189,7 +187,6 @@ End Module
 
         o.StartDate = New Date(1999, 6, 1, 22, 5, 12, 25)
         o.EndDate = New Date(2000, 6, 1, 0, 0, 0)
-
 
         Dim timeZone = TimeZoneInfo.Local.GetUtcOffset(o.StartDate)
 
@@ -208,6 +205,7 @@ End Module
         Assert.AreEqual(Newtonsoft.Json.JsonConvert.SerializeObject(toWrite), Writer.ObjectToString(toWrite))
 
     End Sub
+
     <Test> Public Sub ObjectArray()
         Dim toWrite As Object() = {New With {.Name = "sd"}, New With {.Age = 42}}
         Assert.AreEqual(Newtonsoft.Json.JsonConvert.SerializeObject(toWrite), Writer.ObjectToString(toWrite))
@@ -220,13 +218,11 @@ End Module
         Assert.AreEqual(Newtonsoft.Json.JsonConvert.SerializeObject(toWrite), Writer.ObjectToString(toWrite))
     End Sub
 
-
     <Test> Public Sub Serializeguid()
 
         Dim toWrite = New With {.g = New Guid("FE41254C-FFFC-4121-8345-7353C5D128DC")}
         Assert.AreEqual(Newtonsoft.Json.JsonConvert.SerializeObject(toWrite), Writer.ObjectToString(toWrite))
     End Sub
-
 
     <Test> Public Sub TypeinfoIsIncludede()
 
@@ -239,18 +235,15 @@ End Module
         Writer.AddTypeInfoForObjects = False
     End Sub
 
-
     <Test> Public Sub WriteIEumerableAsArray()
         Dim list As New Stack(Of String)
         list.Push("A")
         list.Push("B")
         list.Push("C")
 
-
         Assert.AreEqual("[""C"",""B"",""A""]", Writer.ObjectToString(list))
 
     End Sub
-
 
     <Test> Public Sub DictionaryIsWrittenAsObjectHash()
         Dim dic As New Dictionary(Of String, String)
@@ -268,9 +261,7 @@ End Module
 
         Assert.AreEqual("{""Value"":1}", Writer.ObjectToString(v))
 
-
     End Sub
-
 
     <Test> Public Sub WriteNonObjects()
 
@@ -302,7 +293,6 @@ End Module
 
     End Sub
 
-
     <Test> Public Sub StrangeBehaviorOnDate()
 
         Dim test = New MyObj
@@ -316,20 +306,15 @@ End Module
 
         Dim resultString = Parser.StringToObject(Of MyObj)(res)
 
-
         Newtonsoft.Json.JsonConvert.DeserializeObject(Of MyObj)("{""SourceTicketId"":""d877c090-1fad-4f95-b2a9-22648787f2b4"",""AccountId"":""c983068f-04e9-402a-acee-0ec9c6995178"",""Owner"":""80a62ae1-ee06-45b7-a8e4-69780db59113"",""Approver"":""9366378f-a200-4cc7-ad1c-340f8a3217a1"",""MinutesAffected"":0,""NewBalance"":360,""TransactionDate"":""2017-03-21T17:46:34.444+01:00""}")
         Parser.StringToObject(Of MyObj)("{""SourceTicketId"":""d877c090-1fad-4f95-b2a9-22648787f2b4"",""AccountId"":""c983068f-04e9-402a-acee-0ec9c6995178"",""Owner"":""80a62ae1-ee06-45b7-a8e4-69780db59113"",""Approver"":""9366378f-a200-4cc7-ad1c-340f8a3217a1"",""MinutesAffected"":0,""NewBalance"":360,""TransactionDate"":""2017-03-21T17:46:34.444+01:00""}")
 
     End Sub
 
-
-
     <Test> Public Sub GenericOverrideThrowsAmbiguousMatchException()
         Dim obj = New NotificationObject(Of String) With {.ViewData = "Test"}
         Assert.DoesNotThrow(Sub() Writer.ObjectToString(obj))
     End Sub
-
-
 
     Public Class MyObj
         Public Property SourceTicketId As Guid = New Guid("d877c090-1fad-4f95-b2a9-22648787f2b4")
@@ -343,7 +328,6 @@ End Module
 
 End Class
 
-
 Public Class NotificationObject(Of TViewData)
     Inherits NotificationObject
 
@@ -354,11 +338,9 @@ Public Class NotificationObject
     Public Property ViewData As Object
 End Class
 
-
 Public Class ClassWithNullable
     Public Intvalue As Integer?
 End Class
-
 
 Public Class ClassWithLong
     Public Value As Long
@@ -367,7 +349,6 @@ End Class
 Public Class Holder(Of T)
     Public Value As T
 End Class
-
 
 Public Class TestWithDArray
     Public Name As String
@@ -387,7 +368,6 @@ Public Class Test
     Public Scores As List(Of String)
 End Class
 
-
 Public Class Person
     Public Navn As String
     Public Alder As Integer
@@ -397,7 +377,6 @@ Public Class Person
     Public TestInfo As Test
     Public ChildCount As Integer?
 End Class
-
 
 Public Class Person2
     Inherits Test
@@ -410,9 +389,8 @@ Public Class ExcavationTripDateTime
     Public StartDate As DateTime
     Public EndDate As DateTime
 End Class
+
 Public Class ExcavationTripDate
     Public StartDate As Date
     Public EndDate As Date
 End Class
-
-

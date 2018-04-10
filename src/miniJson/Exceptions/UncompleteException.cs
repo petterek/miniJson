@@ -3,8 +3,7 @@
 namespace miniJson.Exceptions
 {
     [Serializable()]
-	public class UncompleteException : Exception
-	{
-
-	}
+    public class UncompleteException : Exception
+    {
+    }
 }
