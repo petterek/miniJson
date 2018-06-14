@@ -10,14 +10,11 @@ namespace miniJson
 {
     public class Writer
     {
-
-
-
         public static void ObjectToString(System.IO.Stream result, object o)
         {
             ObjectToString(new System.IO.StreamWriter(result), o);
-
         }
+
         public static string ObjectToString(object o)
         {
             var result = new StreamWriter(new MemoryStream(), System.Text.Encoding.UTF8);
@@ -27,20 +24,17 @@ namespace miniJson
             return new StreamReader(result.BaseStream).ReadToEnd();
         }
 
-
         private static MethodInfo writeToStreamMethodInfo = typeof(StreamWriter).GetMethod("Write", new Type[] { typeof(string) });
         private static MethodInfo writeValueMethodInfo = typeof(Writer).GetMethod("WriteValue", BindingFlags.NonPublic | BindingFlags.Static);
 
-        static Action<StreamWriter, object> Serializer(Type objType)
+        private static Action<StreamWriter, object> Serializer(Type objType)
         {
-
             List<Expression> exprns = new List<Expression>();
             var writer = Expression.Parameter(typeof(StreamWriter));
             var valueObject = Expression.Parameter(typeof(object));
 
             exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant("{")));
             bool first = true;
-
 
             if (AddTypeInfoForObjects)
             {
@@ -64,13 +58,11 @@ namespace miniJson
                 }
                 first = false;
 
-
-
                 Expression memberValue = null;
                 if (m.MemberType == MemberTypes.Property)
                 {
                     PropertyInfo propInfo = null;
-                    foreach(var p in m.DeclaringType.GetProperties())
+                    foreach (var p in m.DeclaringType.GetProperties())
                     {
                         if (p.Name == m.Name)
                         {
@@ -85,31 +77,26 @@ namespace miniJson
                     memberValue = Expression.Field(Expression.Convert(valueObject, objType), m.Name);
                 }
 
-
                 exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant((char)0x22 + m.Name + (char)0x22 + ":")));
                 exprns.Add(Expression.Call(null, writeValueMethodInfo, writer, Expression.Convert(memberValue, typeof(object))));
-
 
                 //      var expr2 = Expression.Lambda(Expression.Call(
                 //      Expression.Convert(Expression.PropertyOrField(Expression.Constant(parent), "Data"), typeof(ICollection<>).MakeGenericType(parent.Data.GetType().GetGenericArguments()))
                 //, "Clear", null, null), null);
-
             }
 
             exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant("}")));
 
             var block = Expression.Block(exprns.ToArray());
 
-
-
             Expression<Action<StreamWriter, object>> expression1 = Expression.Lambda<Action<StreamWriter, object>>(block, writer, valueObject);
             expression1.Reduce();
             return expression1.Compile();
         }
 
-        delegate string GetTypeInfo(object t);
+        private delegate string GetTypeInfo(object t);
 
-        static Dictionary<Type, MyWriter> Formatters = new Dictionary<Type, MyWriter> {
+        private static Dictionary<Type, MyWriter> Formatters = new Dictionary<Type, MyWriter> {
             {
                 typeof(int),
                 (w, val) => w.Write(val.ToString())
@@ -161,20 +148,20 @@ namespace miniJson
                     }
                 }
             }
-
         };
+
         public static bool AddTypeInfoForObjects;
 
-        static GetTypeInfo TypeInfoWriter = DefaultTypeInfoWriter;
-        static string DefaultTypeInfoWriter(object t)
+        private static GetTypeInfo TypeInfoWriter = DefaultTypeInfoWriter;
+
+        private static string DefaultTypeInfoWriter(object t)
         {
             return t.GetType().FullName;
         }
 
-        delegate void MyWriter(StreamWriter writer, object value);
+        private delegate void MyWriter(StreamWriter writer, object value);
 
-
-        static void ObjectToString(StreamWriter result, object o)
+        private static void ObjectToString(StreamWriter result, object o)
         {
             if (o == null)
             {
@@ -205,10 +192,6 @@ namespace miniJson
             result.Flush();
         }
 
-
-
-
-
         private static void WriteDictionary(StreamWriter result, object o)
         {
             result.Write("{");
@@ -230,6 +213,7 @@ namespace miniJson
 
         private static object padLock = new object();
         private static Dictionary<Type, List<System.Reflection.MemberInfo>> typeinfoCache = new Dictionary<Type, List<System.Reflection.MemberInfo>>();
+
         private static IEnumerable<System.Reflection.MemberInfo> GetMembers(Type t)
         {
             if (!typeinfoCache.ContainsKey(t))
@@ -244,7 +228,6 @@ namespace miniJson
             }
             return typeinfoCache[t];
         }
-
 
         private static Dictionary<Type, Action<StreamWriter, object>> funcCache = new Dictionary<Type, Action<StreamWriter, object>>();
 
@@ -283,7 +266,6 @@ namespace miniJson
             result.Write("]");
         }
 
-
         private static void WriteValue(StreamWriter writer, object value)
         {
             if (value == null)
@@ -306,7 +288,6 @@ namespace miniJson
             }
             else
             {
-
                 if (value.GetType().IsValueType)
                 {
                     if (value.GetType().GetMembers(System.Reflection.BindingFlags.DeclaredOnly | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).Count() > 0)
@@ -317,8 +298,6 @@ namespace miniJson
                     {
                         writer.Write(value.ToString());
                     }
-
-
                 }
                 else
                 {
@@ -327,19 +306,16 @@ namespace miniJson
             }
         }
 
-
         private static void WriteDictionary(StreamWriter writer, Type t, IDictionary value)
         {
-
-
         }
-
 
         private static readonly int[] ToEscape = {
             0x22,
             0x2,
             0x5c
         };
+
         private static Dictionary<int, string> Translate = new Dictionary<int, string> {
             {
                 0x9,
@@ -357,7 +333,6 @@ namespace miniJson
                 0xd,
                 "\\r"
             }
-
         };
 
         private static void Writetext(StreamWriter writer, object value)
@@ -381,11 +356,11 @@ namespace miniJson
             writer.Write((char)0x22);
         }
 
-
         private static void WriteNumber(StreamWriter w, object val)
         {
             w.Write(val.ToString().Replace(',', '.'));
         }
+
         private static void WriteDate(StreamWriter w, object value)
         {
             System.DateTime d = (System.DateTime)value;
@@ -393,7 +368,5 @@ namespace miniJson
             w.Write(d.ToString("yyyy-MM-ddTHH\\:mm\\:ss.FFFK"));
             w.Write((char)34);
         }
-
     }
-
 }

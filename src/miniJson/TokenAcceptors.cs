@@ -8,7 +8,7 @@ using System.Reflection;
 
 namespace miniJson
 {
-    static class TokenAcceptors
+    internal static class TokenAcceptors
     {
         public const char ListStart = '[';
         public const char ListEnd = ']';
@@ -20,6 +20,7 @@ namespace miniJson
         public const char Hyphen = '"';
 
         public static Type BuilderFactory = typeof(ObjectBuilder);
+
         public static void EatUntil(char c, IReader nextChar)
         {
             WhiteSpace(nextChar);
@@ -80,7 +81,6 @@ namespace miniJson
             }
         }
 
-
         public static object QuoteOrNull(IReader nextChar)
         {
             if (Quote(nextChar))
@@ -96,12 +96,10 @@ namespace miniJson
             }
 
             return null;
-
         }
 
         public static object StartObjectOrNull(IReader nextChar)
         {
-
             if (nextChar.Current() == ObjectStart)
             {
                 nextChar.Read();
@@ -149,7 +147,6 @@ namespace miniJson
                     CreateAttributeValue(nextChar, ref result, name);
                 } while (CanFindValueSeparator(nextChar));
             }
-
         }
 
         private static Dictionary<string, (Type parser, Type fieldType, MemberInfo field, Func<object, object, object> setter)> parserCache = new Dictionary<string, (Type, Type, MemberInfo, Func<object, object, object>)>();
@@ -201,15 +198,13 @@ namespace miniJson
             {
                 if (resultType.IsValueType)
                 {
-
                     result = info.setter(result, value);
-                }else
+                }
+                else
                 {
                     info.setter(result, value);
                 }
-                
             }
-
 
             //fInfo.SetValue(result, value)
         }
@@ -243,7 +238,6 @@ namespace miniJson
                 nextChar.PeekToBuffer();
             }
         }
-
 
         public static Dictionary<Type, Builder> TypeParserMapper = new Dictionary<Type, Builder> {
             {
@@ -298,8 +292,8 @@ namespace miniJson
                 typeof(float),
                 new SingleParser()
             }
-
         };
+
         static internal bool CanFindValueSeparator(IReader nextChar)
         {
             WhiteSpace(nextChar);

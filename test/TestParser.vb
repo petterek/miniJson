@@ -1,4 +1,3 @@
-
 Imports NUnit.Framework
 
 <TestFixture> Public Class TestParser
@@ -8,25 +7,28 @@ Imports NUnit.Framework
         Assert.AreEqual("Petter", p.Navn)
         'Assert.AreEqual(43, p.Alder
 
-
     End Sub
 
     <Test> Public Sub ParseObjectWithPropertyThatsNotInClass()
         Assert.DoesNotThrow(Sub() Parser.StringToObject(Of Person)("{""Comment"":null}"))
     End Sub
+
     <Test> Public Sub ParseObjectWithNullablePropertySetToNull()
         Assert.DoesNotThrow(Sub() Parser.StringToObject(Of Person)("{""ChildCount"":null}  "))
     End Sub
+
     <Test> Public Sub ParseObjectWithNullableStructFilled()
         Dim toParse = "{""SomeThing"":1,""ADate"":{""Year"":2016,""Month"":10,""Day"":9}}"
         Assert.DoesNotThrow(Sub() Parser.StringToObject(Of ClassWithNullableStruct)(toParse))
         Assert.AreEqual(9, Parser.StringToObject(Of ClassWithNullableStruct)(toParse).ADate.Value.Day)
     End Sub
+
     <Test> Public Sub ParseObjectWithNullableStructNulled()
         Dim toParse = "{""SomeThing"":1,""ADate"":null}"
         Assert.DoesNotThrow(Sub() Parser.StringToObject(Of ClassWithNullableStruct)(toParse))
         Assert.AreEqual(Parser.StringToObject(Of ClassWithNullableStruct)(toParse).ADate, Nothing)
     End Sub
+
     <Test> Public Sub ParseObjectWithSingleAsNonDecimal()
         Assert.DoesNotThrow(Sub() Parser.StringToObject(Of Person)("{""SpeedyGonzales"":0}"))
     End Sub
@@ -55,7 +57,6 @@ Imports NUnit.Framework
         Assert.AreEqual("Petter", p.Navn)
         Assert.AreEqual(4.2, p.Speed)
     End Sub
-
 
     <Test> Public Sub ParseEmptyList()
         Dim p = Parser.StringToObject(Of List(Of Person))("[]")
@@ -102,6 +103,7 @@ Imports NUnit.Framework
         Dim p = Parser.StringToObject(Of TestWithDArray)("{""Name"":""Petter"",""Scores"" : [1.2,2.34,3.12]}")
         Assert.AreEqual(1.2, p.Scores(0))
     End Sub
+
     <Test> Public Sub ParseWithBoolValueNotInObject()
         Assert.DoesNotThrow(Sub() Parser.StringToObject(Of TestWithDArray)("{""Name"":""Petter"",""NotInObject"":false}"))
     End Sub
@@ -109,7 +111,6 @@ Imports NUnit.Framework
     <Test> Public Sub Readguid()
         Dim p = Parser.StringToObject(Of Holder(Of Guid))("{""Value"":""FE41254C-FFFC-4121-8345-7353C5D128DC""}")
         Assert.AreEqual(New Guid("FE41254C-FFFC-4121-8345-7353C5D128DC"), p.Value)
-
 
     End Sub
 
@@ -125,7 +126,6 @@ Imports NUnit.Framework
         Dim v As ClassWithLong = Nothing
         Assert.DoesNotThrow(Sub() v = Parser.StringToObject(Of ClassWithLong)("{""Value"":1446212820320}"))
         Assert.AreEqual(1446212820320, v.Value)
-
 
     End Sub
 
@@ -160,7 +160,6 @@ Imports NUnit.Framework
 
         Assert.AreEqual(-1, retValue.SomeThing)
 
-
     End Sub
 
     <Test> Public Sub ParseStruct()
@@ -174,7 +173,6 @@ Imports NUnit.Framework
 
         'SetTheValue(retValue.ADate)
 
-
         Assert.AreEqual(2016, retValue.Year)
 
     End Sub
@@ -182,7 +180,6 @@ Imports NUnit.Framework
     Sub SetTheValue(ByRef s As DateHolder)
         s.Year = 2016
     End Sub
-
 
     <Test> Public Sub ClassWithArrayDoesNotThrow()
 
@@ -203,7 +200,6 @@ Imports NUnit.Framework
 
         v = Parser.StringToObject(Of ClassWithArray)("{""Attributes"": {""Test"":""Value"",""Test2"":""Value2""} }")
 
-
     End Sub
 
     <Test> Public Sub ParseObjectWithIEnumerableOfStringDoesNotThrow()
@@ -211,6 +207,7 @@ Imports NUnit.Framework
         Assert.AreEqual(2, v.AList.Count)
 
     End Sub
+
     <Test> Public Sub ParseObjectWithIEnumerableOfSomeObjectTypeDoesNotThrow()
         Dim v = Parser.StringToObject(Of ClassWithArray)("{""AnotherList"": [{""A"":""String1"",""B"":15},{""A"":""String1"",""B"":15}] }")
         Assert.AreEqual(2, v.AnotherList.Count)
@@ -224,7 +221,6 @@ Imports NUnit.Framework
 
     End Sub
 
-
     <Test> Public Sub DeserializeEnums()
 
         Dim toTest As ClassWithEnum
@@ -232,15 +228,13 @@ Imports NUnit.Framework
         toTest = Parser.StringToObject(Of ClassWithEnum)("{""Value"": 1}")
         toTest = Parser.StringToObject(Of ClassWithEnum)("{""Value"": ""Value1""}")
 
-
-
     End Sub
 
     <Test> Public Sub SomethingStrangeFromGoogle()
         Dim toTest = "{""azp"": ""529794868022-pholasipv70npdhlaj41lrft2en7m8cg.apps.googleusercontent.com"",
                          ""aud"": ""529794868022-nuif63n2dit7510tvn1h1t5mrsl6k0dn.apps.googleusercontent.com"",
                          ""Sub"": ""106692936747611074481"",
-                         ""email"": ""fredrikaxk@gmail.com"", 
+                         ""email"": ""fredrikaxk@gmail.com"",
                          ""email_verified"": ""True"",
                          ""iss"": ""https//accounts.google.com"",
                          ""iat"": ""1501151900"",
@@ -266,11 +260,9 @@ Imports NUnit.Framework
 
         Dim toTest = Parser.StringToObject(Of DataObject)(Input1)
 
-
         Assert.AreEqual("Petter = the bug killer", toTest.Name)
 
     End Sub
-
 
     <Test> Public Sub EatListOfUnknownProperty()
         Const inp = "{""UnknownField"":[""String1"",{""Strange"":1}],""KnownField"":1}"
@@ -280,9 +272,7 @@ Imports NUnit.Framework
 
         Assert.AreEqual(1, toTest.KnownField)
 
-
     End Sub
-
 
     <Test> Public Sub NULLasContentReturnsNothing()
         Const inp = "null"
@@ -298,13 +288,10 @@ Imports NUnit.Framework
         Public KnownField As Integer
     End Class
 
-
     Public Class GoogleUserInfo
         Public email As String
         Public email_verified As String
     End Class
-
-
 
     Public Class ClassWithEnum
         Public Value As MyEnum
@@ -324,12 +311,10 @@ Imports NUnit.Framework
 
     End Class
 
-
     <Test> Public Sub GenericObjectAsDictionary()
 
         Dim toTest = "{""Integer"" : 1,""Double"":2.1,""String"":""A string""}"
         Dim res = Newtonsoft.Json.JsonConvert.DeserializeObject(Of Dictionary(Of String, Object))(toTest)
-
 
         Assert.AreEqual(1, res("Integer"))
         Assert.AreEqual(2.1, res("Double"))
@@ -337,7 +322,6 @@ Imports NUnit.Framework
         Assert.IsInstanceOf(Of Int64)(res("Integer"))
         Assert.IsInstanceOf(Of Double)(res("Double"))
     End Sub
-
 
     Public Class ClassWithArray
         Public Data As String()
@@ -352,6 +336,7 @@ Imports NUnit.Framework
         Public SomeThing As Integer
         Public ADate As DateHolder
     End Class
+
     Public Class ClassWithNullableStruct
         Public SomeThing As Integer
         Public ADate As DateHolder?
@@ -368,15 +353,12 @@ Imports NUnit.Framework
         Public B As Integer
     End Class
 
-
     <Test> Public Sub EdgeCaseFromPawel()
 
         Dim inp = "{""Actions"":[],""SettingId"":""93Dea120-e62f-48ee-8837-d10a9aee6a8c"",""NodeId"":""c65904cf-c85a-49cc-b8f2-4445Dee941be"",""NodeName"":""Sjokoladefabrikken As"",""Value"":""1""}"
         miniJson.Parser.StringToObject(Of GetByIdAndNodeIdResponse)(inp)
 
-
     End Sub
-
 
     <Test> Public Sub ObjectIlistPropertyDoesNotFail()
 
@@ -388,6 +370,7 @@ Imports NUnit.Framework
         Assert.AreEqual(1, res(0).Mails.Count)
         Assert.AreEqual(1, res(0).Mails(0).PersonId)
     End Sub
+
 End Class
 
 Public Class ClassWithEnumerable
@@ -403,11 +386,11 @@ Public Class GetByIdAndNodeIdResponse
     Public Value As String
 End Class
 
-
 Public Class DataObject
 
     Public Guid As Guid
     Private _id As Integer
+
     Property Id As Integer
         Get
             Return _id
@@ -416,6 +399,7 @@ Public Class DataObject
             _id = value
         End Set
     End Property
+
     Property Name As String
     Property Age As Integer
     Property BirthDay As DateTime
@@ -427,6 +411,5 @@ Public Class DataObject
         Property PersonId As Integer
         Property Address As String
     End Class
-
 
 End Class

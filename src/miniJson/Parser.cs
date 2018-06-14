@@ -8,102 +8,88 @@ using System.IO;
 namespace miniJson
 {
     public static class Parser
-	{
+    {
+        public static T StringToObject<T>(string input) where T : new()
+        {
+            MemoryStream mem = new MemoryStream();
+            StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
+            write.Write(input);
+            write.Flush();
+            write.BaseStream.Position = 0;
+            return StringToObject<T>(new StreamReader(mem, System.Text.Encoding.UTF8));
+        }
 
-		public static T StringToObject<T>(string input) where T : new()
-		{
-			MemoryStream mem = new MemoryStream();
-			StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
-			write.Write(input);
-			write.Flush();
-			write.BaseStream.Position = 0;
-			return StringToObject<T>(new StreamReader(mem, System.Text.Encoding.UTF8));
-		}
+        public static object StringToObject(string input, System.Type type)
+        {
+            MemoryStream mem = new MemoryStream();
+            StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
+            write.Write(input);
+            write.Flush();
+            write.BaseStream.Position = 0;
+            return StringToObject(new ReadStream(new StreamReader(mem, System.Text.Encoding.UTF8)), type);
+        }
 
-		public static object StringToObject(string input, System.Type type)
-		{
-			MemoryStream mem = new MemoryStream();
-			StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
-			write.Write(input);
-			write.Flush();
-			write.BaseStream.Position = 0;
-			return StringToObject(new ReadStream(new StreamReader(mem, System.Text.Encoding.UTF8)), type);
-		}
-
-		//Here we can add another function that accepts stream as parameter
-		public static T StringToObject<T>(StreamReader input) where T : new()
-		{
-
-			return (T)StringToObject(new ReadStream(input), typeof(T));
-
-		}
+        //Here we can add another function that accepts stream as parameter
+        public static T StringToObject<T>(StreamReader input) where T : new()
+        {
+            return (T)StringToObject(new ReadStream(input), typeof(T));
+        }
 
         public static T StringToObject<T>(System.IO.Stream input) where T : new()
         {
-
-            return (T)StringToObject(new ReadStream(new StreamReader( input, System.Text.Encoding.UTF8)), typeof(T));
-
+            return (T)StringToObject(new ReadStream(new StreamReader(input, System.Text.Encoding.UTF8)), typeof(T));
         }
 
         public static object StringToObject(System.IO.Stream input, Type type)
-		{
-			return StringToObject(new ReadStream(new StreamReader( input)), type);
-		}
+        {
+            return StringToObject(new ReadStream(new StreamReader(input)), type);
+        }
 
+        /// <summary>
+        /// This is the main function to parse the incomming stream of bytes.
+        /// It is important that the types is checked in the correct order.
+        ///
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        static internal object StringToObject(IReader input, Type type)
+        {
+            Builder builder;
 
+            //we are trying to create something that is an interface. The we must guess what to create :)
+            //This should boil down to IEnumerable of something.. :)
 
-		/// <summary>
-		/// This is the main function to parse the incomming stream of bytes. 
-		/// It is important that the types is checked in the correct order. 
-		/// 
-		/// </summary>
-		/// <param name="input"></param>
-		/// <param name="type"></param>
-		/// <returns></returns>
-		static internal object StringToObject(IReader input, Type type)
-		{
-			Builder builder;
-
-
-
-            //we are trying to create something that is an interface. The we must guess what to create :) 
-            //This should boil down to IEnumerable of something.. :) 
-            if(type.IsValueType )
+            if (TokenAcceptors.TypeParserMapper.ContainsKey(type))
             {
-                if (type.IsPrimitive)
-                {
-                    builder = new ValueTypeBuilder();
-                }else
-                {
-                    builder = new ObjectBuilder();
-                }
-                    
+                return TokenAcceptors.TypeParserMapper[type].Parse(input, type);
             }
-            else if (type == typeof(string))
-            {
-                builder = new ValueTypeBuilder();
-            }
-            else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>))) {
-                builder = new ArrayBuilder();
-            } else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IList<>)))
+            else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>)))
             {
                 builder = new ArrayBuilder();
             }
-            else if (typeof(IList).IsAssignableFrom(type)) {
+            else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IList<>)))
+            {
                 builder = new ArrayBuilder();
-            } else if (typeof(IDictionary).IsAssignableFrom(type)) {
+            }
+            else if (typeof(IList).IsAssignableFrom(type))
+            {
+                builder = new ArrayBuilder();
+            }
+            else if (typeof(IDictionary).IsAssignableFrom(type))
+            {
                 builder = new DictionaryBuilder();
-            } else if (typeof(ICollection).IsAssignableFrom(type)) {
+            }
+            else if (typeof(ICollection).IsAssignableFrom(type))
+            {
                 builder = new ArrayBuilder();
-            } else {
+            }
+            else
+            {
                 builder = new ObjectBuilder();
             }
 
-
-			return builder.Parse(input, type);
-		}
-
-
-
-	}
+            return builder.Parse(input, type);
+        }
+    }
 }

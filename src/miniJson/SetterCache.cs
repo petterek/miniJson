@@ -1,15 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 
 namespace miniJson
 {
-    static class SetterCreator
+    internal static class SetterCreator
     {
         internal static Func<object, object, object> CreateValueTypeSetter(MemberInfo mInfo)
         {
-
             if (mInfo == null) return null;
 
             System.Type valueType;
@@ -23,10 +21,10 @@ namespace miniJson
             {
                 valueType = declaringType.GetProperty(mInfo.Name).PropertyType;
             }
-            
+
             var exValue = Expression.Parameter(typeof(Object));
             var wrapperTarget = Expression.Parameter(typeof(Object));
-            
+
             var exTarget = Expression.Parameter(declaringType);
             var exBody = Expression.Lambda(
                 Expression.Block(
@@ -45,11 +43,10 @@ namespace miniJson
             Expression<Func<object, object, object>> expression = Expression.Lambda<Func<Object, Object, Object>>(exBlock, wrapperTarget, wrapperValue);
 
             return expression.Compile();
-
         }
+
         internal static Action<object, object> CreateRefSetter(MemberInfo mInfo)
         {
-
             if (mInfo == null) return null;
 
             System.Type valueType;
@@ -72,10 +69,5 @@ namespace miniJson
                             Expression.Convert(exValue, valueType)
                         ), wrapperTarget, exValue).Compile();
         }
-
-
-
-
     }
-
 }

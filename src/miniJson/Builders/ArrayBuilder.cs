@@ -6,125 +6,140 @@ using System.Collections.Generic;
 
 namespace miniJson.Builders
 {
-	internal class ArrayBuilder : Builder
-	{
+    internal class ArrayBuilder : Builder
+    {
+        public override object Parse(IReader nextChar, Type t)
+        {
+            TokenAcceptors.WhiteSpace(nextChar);
+            TokenAcceptors.BufferLegalCharacters(nextChar, "nul");
+            var buffer = nextChar.Buffer;
+            if (buffer == "null")
+                return null;
 
+            TokenAcceptors.EatUntil(TokenAcceptors.ListStart, nextChar);
 
-		public override object Parse(IReader nextChar, Type t)
-		{
+            IParseStrategy strategy;
+            if (t.IsArray)
+            {
+                strategy = new ArrayParserStrategy(t);
+            }
+            else
+            {
+                strategy = new ListParseStrategy(t);
+            }
 
-			TokenAcceptors.WhiteSpace(nextChar);
-			TokenAcceptors.BufferLegalCharacters(nextChar, "nul");
-			var buffer = nextChar.Buffer;
-			if (buffer == "null")
-				return null;
+            TokenAcceptors.WhiteSpace(nextChar);
 
-			TokenAcceptors.EatUntil(TokenAcceptors.ListStart, nextChar);
+            do
+            {
+                if (strategy.InnerType.IsValueType | strategy.InnerType == typeof(string))
+                {
+                    TokenAcceptors.WhiteSpace(nextChar);
+                    if (nextChar.Peek() != TokenAcceptors.ListEnd)
+                    {
+                        strategy.ItemList.Add(TokenAcceptors.TypeParserMapper[strategy.InnerType].Parse(nextChar, t));
+                    }
+                }
+                else
+                {
+                    object v = Parser.StringToObject(nextChar, strategy.InnerType);
+                    if (v != null)
+                    {
+                        strategy.ItemList.Add(v);
+                    }
+                }
+            } while (TokenAcceptors.CanFindValueSeparator(nextChar));
 
-			IParseStrategy strategy;
-			if (t.IsArray) {
-				strategy = new ArrayParserStrategy(t);
-			} else {
-				strategy = new ListParseStrategy(t);
-			}
+            TokenAcceptors.EatUntil(TokenAcceptors.ListEnd, nextChar);
 
-			TokenAcceptors.WhiteSpace(nextChar);
+            return strategy.Result;
+        }
 
-			do {
-				if (strategy.InnerType.IsValueType | strategy.InnerType == typeof(string)) {
-					TokenAcceptors.WhiteSpace(nextChar);
-					if (nextChar.Peek() != TokenAcceptors.ListEnd) {
-						strategy.ItemList.Add(TokenAcceptors.TypeParserMapper[strategy.InnerType].Parse(nextChar, t));
-					}
-				} else {
-					object v = Parser.StringToObject(nextChar, strategy.InnerType);
-					if (v != null) {
-						strategy.ItemList.Add(v);
-					}
-				}
-			} while (TokenAcceptors.CanFindValueSeparator(nextChar));
+        private interface IParseStrategy
+        {
+            IList ItemList { get; }
+            Type InnerType { get; }
+            object Result { get; }
+        }
 
-			TokenAcceptors.EatUntil(TokenAcceptors.ListEnd, nextChar);
+        private class ArrayParserStrategy : IParseStrategy
+        {
+            private Type _innerType;
+            private Type _t;
 
-			return strategy.Result;
-		}
+            public ArrayParserStrategy(Type t)
+            {
+                _t = t;
+                _innerType = t.GetElementType();
+                var tempType = typeof(List<>);
+                _itemList = (IList)Activator.CreateInstance(tempType.MakeGenericType(InnerType));
+            }
 
+            private IList _itemList;
 
-		private interface IParseStrategy
-		{
-			IList ItemList { get; }
-			Type InnerType { get; }
-			object Result { get; }
-		}
+            public IList ItemList
+            {
+                get { return _itemList; }
+            }
 
-		private class ArrayParserStrategy : IParseStrategy
-		{
+            public object Result
+            {
+                get
+                {
+                    object newA = Activator.CreateInstance(_t, _itemList.Count);
+                    _itemList.CopyTo((Array)newA, 0);
+                    return newA;
+                }
+            }
 
-			private Type _innerType;
-			private Type _t;
-			public ArrayParserStrategy(Type t)
-			{
-				_t = t;
-				_innerType = t.GetElementType();
-				var tempType = typeof(List<>);
-				_itemList = (IList)Activator.CreateInstance(tempType.MakeGenericType(InnerType));
-			}
+            public Type InnerType
+            {
+                get { return _innerType; }
+            }
+        }
 
+        private class ListParseStrategy : IParseStrategy
+        {
+            private IList _ItemList;
 
-			private IList _itemList;
-			public IList ItemList {
-				get { return _itemList; }
-			}
+            private Type _innertype;
 
-			public object Result {
-				get {
-					object newA = Activator.CreateInstance(_t, _itemList.Count);
-					_itemList.CopyTo((Array)newA, 0);
-					return newA;
-				}
-			}
+            public ListParseStrategy(Type t)
+            {
+                if (t.IsGenericType)
+                {
+                    _innertype = t.GetGenericArguments()[0];
+                }
+                else
+                {
+                    throw new NonGenericListIsNotSupportedException();
+                }
 
-			public Type InnerType {
-				get { return _innerType; }
-			}
-		}
+                if (t.IsInterface)
+                {
+                    var tempType = typeof(List<>);
+                    _ItemList = (IList)Activator.CreateInstance(tempType.MakeGenericType(InnerType));
+                }
+                else
+                {
+                    _ItemList = (IList)Activator.CreateInstance(t);
+                }
+            }
 
-		private class ListParseStrategy : IParseStrategy
-		{
+            public Type InnerType
+            {
+                get { return _innertype; }
+            }
 
-			private IList _ItemList;
+            public IList ItemList
+            {
+                get { return _ItemList; }
+            }
 
-			private Type _innertype;
-			public ListParseStrategy(Type t)
-			{
-				if (t.IsGenericType) {
-					_innertype = t.GetGenericArguments()[0];
-				} else {
-					throw new NonGenericListIsNotSupportedException();
-				}
-
-				if (t.IsInterface) {
-					var tempType = typeof(List<>);
-					_ItemList = (IList)Activator.CreateInstance(tempType.MakeGenericType(InnerType));
-				} else {
-					_ItemList = (IList)Activator.CreateInstance(t);
-				}
-
-
-			}
-
-			public Type InnerType {
-				get { return _innertype; }
-			}
-
-			public IList ItemList {
-				get { return _ItemList; }
-			}
-
-			public object Result {
-				get { return _ItemList; }
-			}
-		}
-        
-	}
+            public object Result
+            {
+                get { return _ItemList; }
+            }
+        }
+    }
 }

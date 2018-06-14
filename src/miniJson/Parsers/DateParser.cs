@@ -4,25 +4,23 @@ using System;
 
 namespace miniJson.Parsers
 {
-	class DateParser : Builder
-	{
+    internal class DateParser : Builder
+    {
+        public override object Parse(IReader nextChar, Type t)
+        {
+            TokenAcceptors.WhiteSpace(nextChar);
 
+            if (TokenAcceptors.QuoteOrNull(nextChar) == null)
+            {
+                return null;
+            }
+            TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789.:T+Z- ");
 
-		public override object Parse(IReader nextChar, Type t)
-		{
-			TokenAcceptors.WhiteSpace(nextChar);
+            var bufferVal = nextChar.Buffer;
 
-			if (TokenAcceptors.QuoteOrNull(nextChar) == null) {
-				return null;
-			}
-			TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789.:T+Z- ");
+            TokenAcceptors.Quote(nextChar);
 
-			var bufferVal = nextChar.Buffer;
-
-			TokenAcceptors.Quote(nextChar);
-
-			return System.DateTime.Parse(bufferVal);
-
-		}
-	}
+            return System.DateTime.Parse(bufferVal);
+        }
+    }
 }

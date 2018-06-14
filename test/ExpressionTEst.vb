@@ -1,11 +1,9 @@
-﻿
-
-Imports System.Linq.Expressions
+﻿Imports System.Linq.Expressions
 Imports NUnit.Framework
 
 <TestFixture> Public Class ExpressionTEst
 
-    <Test> Public Sub GetOvrriddenProperyInExpression()
+    <Test> Public Sub GetOvrriddenPropertyInExpression()
 
         Dim ex = Expression.PropertyOrField(Expression.Constant(Nothing, GetType(Inherited(Of String))), "field1")
         Dim ex2 = Expression.PropertyOrField(Expression.Constant(Nothing, GetType(Inherited(Of String))), "t2")
@@ -14,9 +12,6 @@ Imports NUnit.Framework
         GetType(Inherited(Of String)).GetProperty("Prop1")
 
         Dim ex3 = Expression.PropertyOrField(Expression.Constant(Nothing, GetType(Inherited(Of String))), "Prop1")
-
-
-
 
     End Sub
 
@@ -39,9 +34,9 @@ Imports NUnit.Framework
             End Set
         End Property
 
-
         Public Shadows field1 As T
         Public Shadows Property Prop1 As T
 
     End Class
+
 End Class

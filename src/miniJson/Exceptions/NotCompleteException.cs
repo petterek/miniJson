@@ -4,6 +4,5 @@ namespace miniJson.Exceptions
 {
     public class NotCompleteException : Exception
     {
-
     }
 }

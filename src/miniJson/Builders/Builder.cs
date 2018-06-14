@@ -3,9 +3,8 @@ using System;
 
 namespace miniJson.Builders
 {
-	abstract class Builder
-	{
-		public abstract object Parse(IReader nextChar, Type t);
-	}
-
+    internal abstract class Builder
+    {
+        public abstract object Parse(IReader nextChar, Type t);
+    }
 }
