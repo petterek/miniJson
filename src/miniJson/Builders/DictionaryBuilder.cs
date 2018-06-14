@@ -38,6 +38,7 @@ namespace miniJson.Builders
 
                 res = (IDictionary)Activator.CreateInstance(t);
                 TokenAcceptors.WhiteSpace(nextChar);
+
                 if (nextChar.Current() == (Char)34)
                 {
                     do
@@ -48,6 +49,10 @@ namespace miniJson.Builders
                         res.Add(key, value);
                     } while (TokenAcceptors.CanFindValueSeparator(nextChar));
                 }
+
+                TokenAcceptors.WhiteSpace(nextChar);
+                if (nextChar.Current() != TokenAcceptors.ObjectEnd) throw new MissingTokenException(TokenAcceptors.ObjectEnd.ToString(), nextChar);
+                nextChar.Read(); //Swollow the last "}"
             }
             //Cleaning out whitespace, check for " to ensure not empty object
 
