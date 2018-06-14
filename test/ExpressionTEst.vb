@@ -3,7 +3,7 @@ Imports NUnit.Framework
 
 <TestFixture> Public Class ExpressionTEst
 
-    <Test> Public Sub GetOvrriddenProperyInExpression()
+    <Test> Public Sub GetOvrriddenPropertyInExpression()
 
         Dim ex = Expression.PropertyOrField(Expression.Constant(Nothing, GetType(Inherited(Of String))), "field1")
         Dim ex2 = Expression.PropertyOrField(Expression.Constant(Nothing, GetType(Inherited(Of String))), "t2")
