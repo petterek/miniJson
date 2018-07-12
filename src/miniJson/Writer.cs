@@ -147,7 +147,12 @@ namespace miniJson
                         w.Write("false");
                     }
                 }
-            }
+            },
+            {
+                typeof(byte),
+                (w, val) => w.Write(val.ToString())
+            },
+
         };
 
         public static bool AddTypeInfoForObjects;

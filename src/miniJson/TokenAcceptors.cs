@@ -291,7 +291,12 @@ namespace miniJson
             {
                 typeof(float),
                 new SingleParser()
+            },
+            {
+                typeof(byte),
+                new ByteParser()
             }
+
         };
 
         static internal bool CanFindValueSeparator(IReader nextChar)

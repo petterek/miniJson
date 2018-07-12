@@ -371,7 +371,24 @@ Imports NUnit.Framework
         Assert.AreEqual(1, res(0).Mails(0).PersonId)
     End Sub
 
+    <Test> Public Sub NullableByteWithNull()
+        Dim inp = "{""Gender"":null}"
+        Dim res = miniJson.Parser.StringToObject(Of ClassWithNullableByte)(inp)
+        Assert.AreEqual(Nothing, res.Gender)
+    End Sub
+
+    <Test> Public Sub NullableByteWithValue()
+        Dim inp = "{""Gender"":2}"
+        Dim res = miniJson.Parser.StringToObject(Of ClassWithNullableByte)(inp)
+        Assert.AreEqual(2, res.Gender)
+    End Sub
+
 End Class
+
+Public Class ClassWithNullableByte
+    Public Gender As Nullable(Of Byte)
+End Class
+
 
 Public Class ClassWithEnumerable
     Public Id As Guid

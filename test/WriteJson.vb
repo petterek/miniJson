@@ -326,6 +326,18 @@ End Module
         Public Property TransactionDate As Date
     End Class
 
+    <Test> Public Sub NullableByteWithNull()
+        Dim test As New ClassWithNullableByte With {.Gender = Nothing}
+        Dim result = miniJson.Writer.ObjectToString(test)
+        Assert.AreEqual("{""Gender"":null}", Writer.ObjectToString(test))
+    End Sub
+
+    <Test> Public Sub NullableByteWithValue()
+        Dim test As New ClassWithNullableByte With {.Gender = 2}
+        Dim result = miniJson.Writer.ObjectToString(test)
+        Assert.AreEqual("{""Gender"":2}", Writer.ObjectToString(test))
+    End Sub
+
 End Class
 
 Public Class NotificationObject(Of TViewData)

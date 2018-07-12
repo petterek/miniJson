@@ -24,7 +24,7 @@ namespace miniJson.Parsers
             return float.Parse(nextChar.Buffer, CultureInfo.InvariantCulture.NumberFormat);
         }
     }
-
+    
     internal class DecimalParser : Builder
     {
         public override object Parse(IReader nextChar, Type t)
