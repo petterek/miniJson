@@ -1,4 +1,4 @@
- #miniJson
+# miniJson
 A C# implementation of json parser/writer. 
 
 Written because I wanted to :) 
