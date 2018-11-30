@@ -338,6 +338,28 @@ End Module
         Assert.AreEqual("{""Gender"":2}", Writer.ObjectToString(test))
     End Sub
 
+
+    <Test> Public Sub NullObjectResturnsNull()
+
+        Dim Test As Object
+        Dim result = miniJson.Writer.ObjectToString(Test)
+
+        Assert.AreEqual("null", result)
+
+    End Sub
+
+    <Test> Public Sub NullIsWrittenToStreamOnNullObject()
+
+        Dim Test As Object
+        Dim result As New System.IO.MemoryStream()
+        miniJson.Writer.ObjectToString(result, Test)
+
+        result.Position = 0
+        Dim sreader = New System.IO.StreamReader(result)
+
+        Assert.AreEqual("null", sreader.ReadToEnd())
+
+    End Sub
 End Class
 
 Public Class NotificationObject(Of TViewData)

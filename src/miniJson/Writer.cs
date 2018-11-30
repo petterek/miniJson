@@ -12,7 +12,9 @@ namespace miniJson
     {
         public static void ObjectToString(System.IO.Stream result, object o)
         {
-            ObjectToString(new System.IO.StreamWriter(result), o);
+            StreamWriter sw = new StreamWriter(result);
+            ObjectToString(sw, o);
+            sw.Flush();
         }
 
         public static string ObjectToString(object o)
@@ -80,9 +82,6 @@ namespace miniJson
                 exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant((char)0x22 + m.Name + (char)0x22 + ":")));
                 exprns.Add(Expression.Call(null, writeValueMethodInfo, writer, Expression.Convert(memberValue, typeof(object))));
 
-                //      var expr2 = Expression.Lambda(Expression.Call(
-                //      Expression.Convert(Expression.PropertyOrField(Expression.Constant(parent), "Data"), typeof(ICollection<>).MakeGenericType(parent.Data.GetType().GetGenericArguments()))
-                //, "Clear", null, null), null);
             }
 
             exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant("}")));
