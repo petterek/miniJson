@@ -18,6 +18,7 @@ namespace miniJson
             write.BaseStream.Position = 0;
             return StringToObject<T>(new StreamReader(mem, System.Text.Encoding.UTF8));
         }
+
         public static object[] StringToObjects(string input, Type[] types)
         {
             MemoryStream mem = new MemoryStream();
@@ -26,6 +27,11 @@ namespace miniJson
             write.Flush();
             write.BaseStream.Position = 0;
             return StringToObjects(new ReadStream(new StreamReader(mem, System.Text.Encoding.UTF8)), types);
+        }
+
+        public static object[] StringToObjects(System.IO.Stream input, Type[] types)
+        {
+            return StringToObjects(new ReadStream(new StreamReader(input, System.Text.Encoding.UTF8)), types);
         }
 
         public static object StringToObject(string input, System.Type type)
