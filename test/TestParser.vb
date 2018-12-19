@@ -2,6 +2,14 @@ Imports NUnit.Framework
 
 <TestFixture> Public Class TestParser
 
+    <Test> Public Sub ParseObjectArray()
+        Dim types() As Type = {GetType(Person), GetType(ClassWithLongBooleanStringProperty)}
+        Dim p = Parser.StringToObjects("[{""Navn"":""Petter""}, {""Value"": 1446212820320,""ValueTrue"":True,""ValueFalse"":False}]", types)
+        Assert.AreEqual(2, p.Length)
+        Assert.True(GetType(Person).IsInstanceOfType(p(0)))
+        Assert.True(GetType(ClassWithLongBooleanStringProperty).IsInstanceOfType(p(1)))
+    End Sub
+
     <Test> Public Sub ParseSimpleObject()
         Dim p = Parser.StringToObject(Of Person)("{""Navn"":""Petter""}  ")
         Assert.AreEqual("Petter", p.Navn)

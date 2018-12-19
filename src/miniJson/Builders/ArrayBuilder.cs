@@ -51,18 +51,18 @@ namespace miniJson.Builders
             } while (TokenAcceptors.CanFindValueSeparator(nextChar));
 
             TokenAcceptors.EatUntil(TokenAcceptors.ListEnd, nextChar);
-
+            
             return strategy.Result;
         }
 
-        private interface IParseStrategy
+        protected interface IParseStrategy
         {
             IList ItemList { get; }
             Type InnerType { get; }
             object Result { get; }
         }
 
-        private class ArrayParserStrategy : IParseStrategy
+        protected class ArrayParserStrategy : IParseStrategy
         {
             private Type _innerType;
             private Type _t;
@@ -98,7 +98,7 @@ namespace miniJson.Builders
             }
         }
 
-        private class ListParseStrategy : IParseStrategy
+        protected class ListParseStrategy : IParseStrategy
         {
             private IList _ItemList;
 

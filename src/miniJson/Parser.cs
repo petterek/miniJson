@@ -19,6 +19,21 @@ namespace miniJson
             return StringToObject<T>(new StreamReader(mem, System.Text.Encoding.UTF8));
         }
 
+        public static object[] StringToObjects(string input, Type[] types)
+        {
+            MemoryStream mem = new MemoryStream();
+            StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
+            write.Write(input);
+            write.Flush();
+            write.BaseStream.Position = 0;
+            return StringToObjects(new ReadStream(new StreamReader(mem, System.Text.Encoding.UTF8)), types);
+        }
+
+        public static object[] StringToObjects(System.IO.Stream input, Type[] types)
+        {
+            return StringToObjects(new ReadStream(new StreamReader(input, System.Text.Encoding.UTF8)), types);
+        }
+
         public static object StringToObject(string input, System.Type type)
         {
             MemoryStream mem = new MemoryStream();
@@ -43,6 +58,12 @@ namespace miniJson
         public static object StringToObject(System.IO.Stream input, Type type)
         {
             return StringToObject(new ReadStream(new StreamReader(input)), type);
+        }
+
+        static internal object[] StringToObjects(IReader input, Type[] types)
+        {
+            Builder builder = new ObjectArrayBuilder(types);
+            return (object[])builder.Parse(input, typeof(object[]));
         }
 
         /// <summary>
