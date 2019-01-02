@@ -360,6 +360,71 @@ End Module
         Assert.AreEqual("null", sreader.ReadToEnd())
 
     End Sub
+
+    <Test> Public Sub ByteArrayIsSerializedAsBase64String()
+        Dim out As New ClassWithByteArray()
+        Dim mystring = "BlaBlaBla"
+
+        out.MyArray = System.Text.Encoding.UTF8.GetBytes(mystring)
+
+        Dim result As New System.IO.MemoryStream()
+        miniJson.Writer.ObjectToString(result, out)
+
+        result.Position = 0
+        Dim sreader = New System.IO.StreamReader(result)
+
+        Dim resultString As String = sreader.ReadToEnd()
+
+        Dim convertedbytes = miniJson.Parser.StringToObject(Of ClassWithByteArray)(resultString)
+
+
+        Assert.AreEqual(mystring, Text.Encoding.UTF8.GetString(convertedbytes.MyArray))
+
+    End Sub
+    <Test> Public Sub ByteArrayIsSerializedAsBase64StringEmptyArray()
+        Dim out As New ClassWithByteArray()
+        Dim mystring = ""
+
+        out.MyArray = System.Text.Encoding.UTF8.GetBytes(mystring)
+
+        Dim result As New System.IO.MemoryStream()
+        miniJson.Writer.ObjectToString(result, out)
+
+        result.Position = 0
+        Dim sreader = New System.IO.StreamReader(result)
+
+        Dim resultString As String = sreader.ReadToEnd()
+
+        Dim convertedbytes = miniJson.Parser.StringToObject(Of ClassWithByteArray)(resultString)
+
+        Assert.AreEqual(mystring, Text.Encoding.UTF8.GetString(convertedbytes.MyArray))
+
+    End Sub
+    <Test> Public Sub ByteArrayIsSerializedAsBase64StringNullArray()
+        Dim out As New ClassWithByteArray()
+
+        Dim result As New System.IO.MemoryStream()
+        miniJson.Writer.ObjectToString(result, out)
+
+        result.Position = 0
+        Dim sreader = New System.IO.StreamReader(result)
+
+        Dim resultString As String = sreader.ReadToEnd()
+
+        Assert.AreEqual("{""MyArray"":null}", resultString)
+
+        Dim convertedbytes = miniJson.Parser.StringToObject(Of ClassWithByteArray)(resultString)
+
+        Assert.IsNull(convertedbytes.MyArray)
+
+    End Sub
+
+
+End Class
+
+
+Public Class ClassWithByteArray
+    Public MyArray As Byte()
 End Class
 
 Public Class NotificationObject(Of TViewData)

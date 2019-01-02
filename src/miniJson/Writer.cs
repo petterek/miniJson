@@ -151,6 +151,9 @@ namespace miniJson
                 typeof(byte),
                 (w, val) => w.Write(val.ToString())
             },
+            {
+                typeof(byte[]),
+                (w, val)=> w.Write("\"" + System.Convert.ToBase64String((byte[])val) + "\"") },
 
         };
 

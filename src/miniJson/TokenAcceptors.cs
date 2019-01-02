@@ -238,6 +238,14 @@ namespace miniJson
                 nextChar.PeekToBuffer();
             }
         }
+        public static void BufferUntil(IReader nextChar, string stop)
+        {
+            var toArray = stop.ToArray();
+            while (toArray.Contains(nextChar.Peek()))
+            {
+                nextChar.PeekToBuffer();
+            }
+        }
 
         public static Dictionary<Type, Builder> TypeParserMapper = new Dictionary<Type, Builder> {
             {
@@ -295,6 +303,9 @@ namespace miniJson
             {
                 typeof(byte),
                 new ByteParser()
+            },
+            {   typeof(byte[]),
+                new ByteArrayParser()
             }
 
         };
