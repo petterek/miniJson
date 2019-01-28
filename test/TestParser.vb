@@ -292,6 +292,31 @@ Imports NUnit.Framework
 
     End Sub
 
+
+
+    <Test> Public Sub DeserialilzingEmptyIDictionary()
+        Const inp = "{""Data"":{}}"
+        Dim d As ClassWithIDictionary
+
+        Assert.DoesNotThrow(Sub() d = Parser.StringToObject(Of ClassWithIDictionary)(inp))
+
+
+    End Sub
+
+    <Test> Public Sub DeserialilzingIDictionary()
+        Const inp = "{""Data"":{""Value1"":""Value1""}}"
+        Dim d As ClassWithIDictionary = Nothing
+
+        Assert.DoesNotThrow(Sub() d = Parser.StringToObject(Of ClassWithIDictionary)(inp))
+        Assert.AreEqual("Value1", d.Data("Value1"))
+
+    End Sub
+
+    Public Class ClassWithIDictionary
+        Public Data As IDictionary
+    End Class
+
+
     Public Class MissingFieldClass
         Public KnownField As Integer
     End Class

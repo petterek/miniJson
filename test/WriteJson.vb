@@ -423,6 +423,9 @@ End Module
 End Class
 
 
+
+
+
 Public Class ClassWithByteArray
     Public MyArray As Byte()
 End Class

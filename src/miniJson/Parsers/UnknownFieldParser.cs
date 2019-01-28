@@ -45,7 +45,7 @@ namespace miniJson.Parsers
                     value = TokenAcceptors.TypeParserMapper[typeof(bool)].Parse(nextChar, typeof(BoolanParser));
                     break;
 
-                case 44:
+                case 44: 
                     value = null;
                     break;
 

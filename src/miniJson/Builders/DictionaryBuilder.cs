@@ -1,7 +1,9 @@
 using miniJson.Exceptions;
+using miniJson.Parsers;
 using miniJson.Stream;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace miniJson.Builders
@@ -21,6 +23,7 @@ namespace miniJson.Builders
                 object value;
                 var getGenericArguments = t.GetGenericArguments();
                 Type typeOfValue;
+                Type useParser =null;
 
                 //Name value
                 if (getGenericArguments.Count() == 2)
@@ -30,13 +33,23 @@ namespace miniJson.Builders
                         throw new UnsupportedDictionaryException();
                     }
                     typeOfValue = getGenericArguments[1];
+                    res = (IDictionary)Activator.CreateInstance(t);
                 }
                 else
                 {
-                    throw new UnsupportedDictionaryException();
+                    if(t == typeof(IDictionary))
+                    {
+                        typeOfValue = typeof(object);
+                        res = new Dictionary<string, object>();
+                        useParser = typeof(UnknownFieldParser);
+                    }else
+                    {
+                        throw new UnsupportedDictionaryException();
+                    }
+                    
                 }
 
-                res = (IDictionary)Activator.CreateInstance(t);
+                
                 TokenAcceptors.WhiteSpace(nextChar);
 
                 if (nextChar.Current() == (Char)34)
@@ -45,7 +58,7 @@ namespace miniJson.Builders
                     {
                         key = TokenAcceptors.Attribute(nextChar);
                         TokenAcceptors.EatUntil(TokenAcceptors.Qualifier, nextChar);
-                        value = TokenAcceptors.ParseValue(typeOfValue, nextChar);
+                        value = TokenAcceptors.ParseValue(typeOfValue, nextChar, useParser);
                         res.Add(key, value);
                     } while (TokenAcceptors.CanFindValueSeparator(nextChar));
                 }
