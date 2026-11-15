@@ -11,7 +11,8 @@ Supports string and stream input/output.
 
 ## Contents
 
-- [Version 2.0.0](#version-200)
+- [Version 3.0.0](#version-300)
+- [Released version 2.0.0](#released-version-200)
 - [Install](#install)
 - [Usage](#usage)
 - [Experimental source-generated deserialization](#experimental-source-generated-deserialization)
@@ -19,7 +20,24 @@ Supports string and stream input/output.
 - [Build and test](#build-and-test)
 - [Benchmarks](#benchmarks)
 
-## Version 2.0.0
+## Version 3.0.0
+
+The runtime library targets **.NET Standard 2.1** and includes opt-in
+source-generated deserialization for mutable classes, arrays, and immutable
+record classes. JSON fields and properties match case-insensitively in both
+generated and reflection readers. Double parsing uses a faster shared numeric
+scanner and stack-buffer conversion; serialization is unchanged.
+
+**Breaking behavior change:** member matching is now case-insensitive.
+Case-colliding fields/properties are rejected as ambiguous, and the last
+matching JSON value wins. Dictionary keys and serialized member names are
+unchanged.
+
+The experimental generator is distributed separately as
+`miniJson.SourceGeneration`. Existing APIs remain reflection-based unless
+you pass a generated descriptor.
+
+## Released version 2.0.0
 
 **Breaking compatibility change:** the released 2.0.0 library targets .NET 11 instead of
 .NET Standard 2.0. Applications targeting older frameworks must stay on 1.4.0
@@ -37,16 +55,27 @@ not performance guarantees.
 
 ## Install
 
-The published 2.0.0 package requires .NET 11. This release is distributed through
-[GitHub Releases](https://github.com/petterek/miniJson/releases/tag/v2.0.0),
+The 3.0.0 runtime package targets .NET Standard 2.1; .NET Framework is not
+supported. Packages are distributed through
+[GitHub Releases](https://github.com/petterek/miniJson/releases/tag/v3.0.0),
 not NuGet.org.
 
-Download `miniJson.2.0.0.nupkg` into a local `packages` directory, then run
+Download `miniJson.3.0.0.nupkg` into a local `packages` directory, then run
 from your application's project directory:
 
 ```sh
-dotnet add package miniJson --version 2.0.0 --source ./packages
+dotnet add package miniJson --version 3.0.0 --source ./packages
 ```
+
+For source-generated deserialization, also download
+`miniJson.SourceGeneration.3.0.0.nupkg` to the same directory and run:
+
+```sh
+dotnet add package miniJson.SourceGeneration --version 3.0.0 --source ./packages
+```
+
+Set `PrivateAssets="all"` on the generator's `PackageReference` so it remains
+a build-time dependency of your project.
 
 ## Usage
 
@@ -77,18 +106,30 @@ for heterogeneous arrays.
 
 ## Experimental source-generated deserialization
 
-Available on `master` as unreleased development code, **not in the
+Available in the separate 3.0.0 analyzer package, **not in the
 released 2.0.0 package**. This opt-in feature generates typed object construction,
 member assignments, and array parsing; it reuses the existing tokenizer and
 scalar readers. Serialization is unchanged.
 
-The development runtime library targets **.NET Standard 2.1**; .NET Framework
+The runtime library targets **.NET Standard 2.1**; .NET Framework
 does not support this target. The analyzer targets .NET Standard 2.0. Building
 this checkout still requires the .NET 11 SDK for its tests and benchmarks.
-Projects declaring records on .NET Standard 2.1 also need an
+The generator requires a C# compiler host with Roslyn 4.14 or newer.
+Projects declaring records on .NET Standard 2.1 also need a
 `System.Runtime.CompilerServices.IsExternalInit` compatibility shim.
 
-Reference both projects from your application, adjusting the paths:
+After installing both packages, your application should reference them as:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="miniJson" Version="3.0.0" />
+  <PackageReference Include="miniJson.SourceGeneration" Version="3.0.0"
+                    PrivateAssets="all" />
+</ItemGroup>
+```
+
+When working from a source checkout, you can instead reference both projects,
+adjusting the paths:
 
 ```xml
 <ItemGroup>
@@ -117,7 +158,9 @@ public record Person(string Name, int Age, int[] Scores);
 ```
 
 Passing a generated descriptor opts in; existing `typeof(Person[])` calls
-still use reflection. Generated readers support writable public fields and
+still use reflection. The descriptor overloads do not require a parameterless
+constructor, unlike `Parser.StringToObject<T>(json)` with no descriptor.
+Generated readers support writable public fields and
 properties on classes with a public parameterless constructor, supported
 primitive types, and their one-dimensional arrays. Mutable records with
 `get; set;` properties also work.
@@ -132,7 +175,7 @@ Explicit JSON null overrides an optional default where the existing type
 reader accepts null. Nested records, record arrays, and recursive record
 graphs use the same generated readers.
 
-**Unreleased behavior change:** JSON property and field names now match
+**3.0.0 behavior change:** JSON property and field names now match
 case-insensitively in both generated and reflection readers. The last matching
 value wins. Dictionary keys and serialized CLR member names are unchanged.
 Case-colliding schemas produce a generator fallback warning and throw
@@ -144,8 +187,13 @@ constructors, unbound read-only/init-only members, required members, and
 record structs do not get generated readers. Reflection fallback still needs
 its existing constructor/type support; immutable records generally require
 a generated descriptor. Byte arrays retain their Base64 format.
-The generator is currently a project-reference experiment, not a packaged
-analyzer.
+The generator is experimental; serialization is not generated.
+
+The implementation is in
+[`src/miniJson.SourceGeneration/MiniJsonGenerator.cs`](src/miniJson.SourceGeneration/MiniJsonGenerator.cs).
+It emits `MiniJsonTypeInfo<T>` descriptors that call the shared `MiniJsonReader`.
+Generator diagnostics identify invalid contexts (`MJG001`), unsupported root
+types using reflection fallback (`MJG002`), and invalid registrations (`MJG003`).
 
 ### Experiment results
 
@@ -179,15 +227,16 @@ including the ASCII stack-buffer copy, per 100 exponent tokens.
 ## Compatibility and limitations
 
 miniJson is a known-type parser, not an arbitrary dynamic JSON parser or a
-complete JSON syntax validator. All 95 valid JSONTestSuite fixtures with
-declared schemas are accepted, but the typed adapter still accepts 31 invalid
-fixtures and excludes three unsupported deep-recursion schemas. Acceptance
+complete JSON syntax validator. The released-version check accepted all 95
+valid JSONTestSuite fixtures with declared schemas, but the typed adapter also
+accepted 31 invalid fixtures and excluded three unsupported deep-recursion
+schemas. Acceptance
 does not prove full syntax validation or value preservation.
 
 Existing wire behavior is retained: `\n` becomes `Environment.NewLine`,
 string APIs replace unpaired UTF-16 surrogates, and stream output rejects them.
 Byte arrays use Base64 and unknown object members are not assigned.
-Released 2.0.0 matches member names case-sensitively; the unreleased code on master
+Released 2.0.0 matches member names case-sensitively; 3.0.0
 uses case-insensitive matching.
 
 ## Build and test
@@ -195,6 +244,7 @@ uses case-insensitive matching.
 Requires the .NET 11 SDK.
 
 ```sh
+dotnet restore miniJson.sln
 dotnet build miniJson.sln
 dotnet test test/test.vbproj
 dotnet test test.SourceGeneration/miniJson.SourceGeneration.Tests.csproj
@@ -202,10 +252,19 @@ dotnet test test/test.vbproj --filter "FullyQualifiedName=test.TestParser.ParseS
 dotnet test test/test.vbproj -c Release --collect:"Code Coverage;Format=Cobertura"
 ```
 
-The development library targets .NET Standard 2.1; tests and benchmarks target
-.NET 11. Building the library also creates a NuGet package.
-Both suites pass: 163 existing tests and 84 generator tests. Released-version
-coverage was 87.1% of library lines and 82.8% of library branches; these figures
+The runtime library targets .NET Standard 2.1; the analyzer targets .NET
+Standard 2.0; tests and benchmarks target .NET 11. Building the runtime library
+also creates its NuGet packages. To pack the analyzer:
+
+```sh
+dotnet pack src/miniJson.SourceGeneration/miniJson.SourceGeneration.csproj -c Release
+```
+
+Both suites pass: **247 tests** (163 VB.NET tests and 84 source-generation
+integration/diagnostic tests). The Release build also succeeds, with existing
+VB.NET warnings and expected generator fallback warnings in the tests.
+Released-version coverage was 87.1% of library lines and 82.8% of library
+branches; these figures
 exclude test assemblies, the generator experiment, and external JSONTestSuite
 runs.
 
