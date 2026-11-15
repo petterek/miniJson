@@ -1,38 +1,69 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace miniJson.Stream
 {
     internal class ReadStream : IReader
     {
-        private readonly StreamReader _StreamReader;
+        private readonly TextReader _Reader;
         private readonly Queue<char> internaleBuffer = new Queue<char>();
+        private char lastBuffered;
 
         private long _position;
 
-        public ReadStream(StreamReader s)
+        public ReadStream(TextReader s)
         {
-            _StreamReader = s;
+            _Reader = s;
         }
 
         public char Peek()
         {
             if (internaleBuffer.Count > 0)
             {
-                return internaleBuffer.ToArray()[internaleBuffer.Count - 1];
+                return lastBuffered;
             }
             else
             {
-                return (char)(_StreamReader.Peek());
+                return (char)(_Reader.Peek());
             }
         }
 
         public char PeekToBuffer()
         {
-            var ret = (char)_StreamReader.Read();
-            internaleBuffer.Enqueue(ret);
-            return ret;
+            if (TryPeekToBuffer(out var value))
+            {
+                return value;
+            }
+            internaleBuffer.Enqueue(char.MaxValue);
+            lastBuffered = char.MaxValue;
+            return char.MaxValue;
+        }
+
+        public bool TryPeekToBuffer(out char value)
+        {
+            var next = _Reader.Read();
+            if (next < 0)
+            {
+                value = default;
+                return false;
+            }
+            value = (char)next;
+            internaleBuffer.Enqueue(value);
+            lastBuffered = value;
+            return true;
+        }
+
+        public void BufferString()
+        {
+            while (TryPeekToBuffer(out var value))
+            {
+                if (value == '"' || value == '\\')
+                {
+                    return;
+                }
+            }
+            throw new EndOfStreamException("Unexpected end of JSON string.");
         }
 
         public char Read()
@@ -40,7 +71,7 @@ namespace miniJson.Stream
             _position += 1;
             if (internaleBuffer.Count == 0)
             {
-                return (char)_StreamReader.Read();
+                return (char)_Reader.Read();
             }
             else
             {
@@ -63,19 +94,22 @@ namespace miniJson.Stream
         {
             get
             {
-                System.Text.StringBuilder ret = new StringBuilder();
-                while (internaleBuffer.Count > 1)
+                return string.Create(Math.Max(0, internaleBuffer.Count - 1), internaleBuffer, static (characters, queue) =>
                 {
-                    ret.Append(internaleBuffer.Dequeue());
-                }
-                return ret.ToString();
+                    for (var index = 0; index < characters.Length; index++)
+                    {
+                        characters[index] = queue.Dequeue();
+                    }
+                });
             }
         }
 
         public string BufferPeek
         {
-            get { return new string(internaleBuffer.ToArray()); }
+            get { return PeekBuffer(internaleBuffer.Count); }
         }
+
+        public ReadOnlySpan<char> BufferSpan => Buffer.AsSpan();
 
         public char Current()
         {
@@ -83,7 +117,7 @@ namespace miniJson.Stream
             {
                 return (char)(0);
             }
-            return internaleBuffer.ToArray()[internaleBuffer.Count - 1];
+            return lastBuffered;
         }
 
         public void ClearBuffer()
@@ -98,19 +132,24 @@ namespace miniJson.Stream
         {
             get
             {
-                if (internaleBuffer.Count < 2)
-                {
-                    return "";
-                }
-                StringBuilder ret = new StringBuilder();
-                var buffA = internaleBuffer.ToArray();
-                for (var x = 0; x <= internaleBuffer.Count - 2; x++)
-                {
-                    ret.Append(buffA[x]);
-                }
-
-                return ret.ToString();
+                return PeekBuffer(Math.Max(0, internaleBuffer.Count - 1));
             }
+        }
+
+        private string PeekBuffer(int count)
+        {
+            return string.Create(count, internaleBuffer, static (characters, queue) =>
+            {
+                var index = 0;
+                foreach (var value in queue)
+                {
+                    if (index == characters.Length)
+                    {
+                        break;
+                    }
+                    characters[index++] = value;
+                }
+            });
         }
 
         public long Position

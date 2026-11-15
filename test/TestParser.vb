@@ -1,3 +1,4 @@
+Imports System.Globalization
 Imports NUnit.Framework
 
 <TestFixture> Public Class TestParser
@@ -15,6 +16,215 @@ Imports NUnit.Framework
         Assert.AreEqual("Petter", p.Navn)
         'Assert.AreEqual(43, p.Alder
 
+    End Sub
+
+    <TestCase("\u0060\u012a\u12AB", "`" & ChrW(&H12A) & ChrW(&H12AB)),
+        TestCase("\uD834\uDd1e", ChrW(&HD834) & ChrW(&HDD1E)),
+        TestCase("\u0000", vbNullChar),
+        TestCase("\u0022\u005C", """\"),
+        TestCase("\u000A", vbLf),
+        TestCase("\\u0061", "\u0061")>
+    Public Sub ParseUnicodeEscapes(input As String, expected As String)
+        Assert.AreEqual(expected, Parser.StringToObject("""" & input & """", GetType(String)))
+    End Sub
+
+    <TestCase(False), TestCase(True)>
+    Public Sub ParseAdjacentEscapesAndFollowingArrayValues(useStream As Boolean)
+        Dim escaped = "\t\r\n\b\f\/\\" & "\""" & "\u0041\u0062\uD834\uDD1E!"
+        Dim input = "[""" & escaped & """,""next"",""""]"
+        Dim expected = vbTab & vbCr & Environment.NewLine & vbBack & vbFormFeed & "/\""" &
+            "Ab" & Char.ConvertFromUtf32(&H1D11E) & "!"
+        Dim actual As List(Of String)
+        If useStream Then
+            Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+                actual = Parser.StringToObject(Of List(Of String))(stream)
+                Assert.IsTrue(stream.CanRead)
+            End Using
+        Else
+            actual = Parser.StringToObject(Of List(Of String))(input)
+        End If
+        CollectionAssert.AreEqual({expected, "next", ""}, actual)
+    End Sub
+
+    <TestCase(0), TestCase(15), TestCase(16), TestCase(31),
+        TestCase(32), TestCase(63), TestCase(64), TestCase(65)>
+    Public Sub BulkStringScanningPreservesEscapesAndDelimiters(prefixLength As Integer)
+        Dim prefix = New String("x"c, prefixLength)
+        Dim suffix = New String("y"c, prefixLength + 3)
+        Dim encoded = prefix & "\u0041\" & ChrW(34) & "\\\u0000" & suffix
+        Dim input = "[""" & encoded & """,""next"",""""]"
+        Dim expected = {prefix & "A" & ChrW(34) & ChrW(92) & vbNullChar & suffix, "next", ""}
+        CollectionAssert.AreEqual(expected, Parser.StringToObject(Of List(Of String))(input))
+        Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+            CollectionAssert.AreEqual(expected, Parser.StringToObject(Of List(Of String))(stream))
+        End Using
+    End Sub
+
+    <TestCase(False), TestCase(True)>
+    Public Sub MemberLookupPreservesDecodedNamesCaseAndType(useStream As Boolean)
+        Const input = "{""Va\u006cue"":1,""Ignored"":[true,false],""Value"":2,""value"":99}"
+        For pass = 1 To 2
+            Dim actual As MemberLookupTarget
+            If useStream Then
+                Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+                    actual = Parser.StringToObject(Of MemberLookupTarget)(stream)
+                End Using
+            Else
+                actual = Parser.StringToObject(Of MemberLookupTarget)(input)
+            End If
+            Assert.AreEqual(2, actual.Value)
+            Assert.AreEqual("text", Parser.StringToObject(Of Holder(Of String))("{""Value"":""text""}").Value)
+        Next
+    End Sub
+
+    <TestCase(False), TestCase(True)>
+    Public Sub ParseLiteralNoncharactersAndEscapedNullBeforeDelimiters(useStream As Boolean)
+        Dim text = "before" & ChrW(&HFFFF) & ChrW(&HFFFE) & "after"
+        Dim input = "{""" & text & """:[""" & text & """,""\u0000"",""""]}"
+        Dim actual As Dictionary(Of String, List(Of String))
+        If useStream Then
+            Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+                actual = Parser.StringToObject(Of Dictionary(Of String, List(Of String)))(stream)
+            End Using
+        Else
+            actual = Parser.StringToObject(Of Dictionary(Of String, List(Of String)))(input)
+        End If
+        CollectionAssert.AreEqual({text, vbNullChar, ""}, actual(text))
+    End Sub
+
+    <TestCase("0"), TestCase("-1.25e+2"), TestCase("1e-100")>
+    Public Sub ParseNumberAtEndOfInputMatchesStream(input As String)
+        Dim expected = Double.Parse(input, CultureInfo.InvariantCulture)
+        Assert.AreEqual(expected, Parser.StringToObject(Of Double)(input))
+        Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+            Assert.AreEqual(expected, Parser.StringToObject(Of Double)(stream))
+        End Using
+    End Sub
+
+    <TestCase("\x"), TestCase("\U0041"), TestCase("\u00/g")>
+    Public Sub RejectInvalidStringEscapes(input As String)
+        Assert.Throws(Of FormatException)(Sub() Parser.StringToObject("""" & input & """", GetType(String)))
+    End Sub
+
+    <TestCase("D800", "FFFD"),
+        TestCase("DC00", "FFFD"),
+        TestCase("D800 0078 DC00", "FFFD 0078 FFFD"),
+        TestCase("D834 DD1E", "D834 DD1E")>
+    Public Sub StringInputPreservesUtf8SurrogateReplacement(inputUnits As String, expectedUnits As String)
+        Dim input = New String(inputUnits.Split(" "c).Select(Function(unit) ChrW(Convert.ToInt32(unit, 16))).ToArray())
+        Dim expected = New String(expectedUnits.Split(" "c).Select(Function(unit) ChrW(Convert.ToInt32(unit, 16))).ToArray())
+        Assert.AreEqual(expected, Parser.StringToObject("""" & input & """", GetType(String)))
+    End Sub
+
+    <Test> Public Sub StringInputPreservesNullInputBehavior()
+        Dim input As String = Nothing
+        Assert.IsNull(Parser.StringToObject(Of Person)(input))
+        Assert.IsNull(Parser.StringToObject(input, GetType(Person)))
+        Assert.IsNull(Parser.StringToObject(input, GetType(String)))
+        Assert.Throws(Of FormatException)(Sub() Parser.StringToObject(Of Integer)(input))
+    End Sub
+
+    <Test> Public Sub StringInputPreservesLeadingBomBehavior()
+        Dim input = ChrW(&HFEFF) & "{""Navn"":""Test""}"
+        Assert.IsNull(Parser.StringToObject(Of Person)(input))
+        Assert.IsNull(Parser.StringToObject(input, GetType(Person)))
+    End Sub
+
+    <Test> Public Sub ParseUnicodeEscapesInDictionaryKeysAndArrayValues()
+        Dim dictionary = Parser.StringToObject(Of Dictionary(Of String, Integer))("{""\u0061\u0000"":42}")
+        Assert.AreEqual(42, dictionary("a" & vbNullChar))
+
+        Dim values = Parser.StringToObject(Of List(Of String))("[""\u0061"",""\u0062""]")
+        CollectionAssert.AreEqual({"a", "b"}, values)
+    End Sub
+
+    <TestCase("\u"), TestCase("\u12"), TestCase("\u12xz")>
+    Public Sub RejectMalformedUnicodeEscapes(input As String)
+        Assert.Throws(Of FormatException)(Sub() Parser.StringToObject("""" & input & """", GetType(String)))
+    End Sub
+
+    <TestCase(""), TestCase("abc"), TestCase("\uD800\""")>
+    Public Sub RejectUnterminatedStrings(input As String)
+        Assert.Throws(Of System.IO.EndOfStreamException)(Sub() Parser.StringToObject("""" & input, GetType(String)))
+    End Sub
+
+    <TestCase("1e2", "100"),
+        TestCase("1E+2", "100"),
+        TestCase("1.25e-2", "0.0125"),
+        TestCase("-2.5e+3", "-2500"),
+        TestCase("0e1", "0")>
+    Public Sub ParseExponentNumbers(input As String, expected As String)
+        Dim expectedDouble = Double.Parse(expected, CultureInfo.InvariantCulture)
+        Assert.AreEqual(expectedDouble, Parser.StringToObject(Of Double)(input))
+        Assert.AreEqual(Single.Parse(expected, CultureInfo.InvariantCulture), Parser.StringToObject(Of Single)(input))
+        Assert.AreEqual(Decimal.Parse(expected, CultureInfo.InvariantCulture), Parser.StringToObject(Of Decimal)(input))
+
+        Dim values = Parser.StringToObject(Of List(Of Double))("[" & input & ",2]")
+        CollectionAssert.AreEqual({expectedDouble, 2.0}, values)
+    End Sub
+
+    <TestCase(False), TestCase(True)>
+    Public Sub ParseUnicodeAndExponentsAcrossReaderBuffers(useStream As Boolean)
+        Dim prefix = New String("x"c, 4096)
+        Dim input = "{""Navn"":""" & prefix & "\uD834\uDD1E\u0000"",""Speed"":-1.25E+2}"
+        Dim result As Person
+
+        If useStream Then
+            Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+                result = Parser.StringToObject(Of Person)(stream)
+                Assert.IsTrue(stream.CanRead)
+            End Using
+        Else
+            result = Parser.StringToObject(Of Person)(input)
+        End If
+
+        Assert.AreEqual(prefix & Char.ConvertFromUtf32(&H1D11E) & vbNullChar, result.Navn)
+        Assert.AreEqual(-125.0, result.Speed)
+    End Sub
+
+    <TestCase("+1"), TestCase("1e+"), TestCase("1e-"), TestCase("1e++2"),
+        TestCase(".2e-3"), TestCase("0.e1"), TestCase("2.e+3")>
+    Public Sub RejectMalformedExponentNumbers(input As String)
+        Assert.Throws(Of FormatException)(Sub() Parser.StringToObject(Of Double)(input))
+        Assert.Throws(Of FormatException)(Sub() Parser.StringToObject(Of Single)(input))
+        Assert.Throws(Of FormatException)(Sub() Parser.StringToObject(Of Decimal)(input))
+    End Sub
+
+    <TestCase("00"), TestCase("01"), TestCase("-01"), TestCase("1."),
+        TestCase("1e"), TestCase("--1"), TestCase("1e2.3"), TestCase("1ee2")>
+    Public Sub RejectMalformedFloatingNumberTokens(input As String)
+        For Each targetType In {GetType(Double), GetType(Single), GetType(Decimal)}
+            Assert.Throws(Of FormatException)(Sub() Parser.StringToObject(input, targetType))
+            Using stream = New System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input))
+                Assert.Throws(Of FormatException)(Sub() Parser.StringToObject(stream, targetType))
+            End Using
+        Next
+    End Sub
+
+    <Test> Public Sub ParseNullableNumbersInArraysAndLists()
+        Const input = "[1,null,null,null,2]"
+        Dim expected As Double?() = {1, Nothing, Nothing, Nothing, 2}
+
+        Dim array = DirectCast(Parser.StringToObject(input, GetType(Double?())), Double?())
+        CollectionAssert.AreEqual(expected, array)
+        CollectionAssert.AreEqual(expected, Parser.StringToObject(Of List(Of Double?))(input))
+        CollectionAssert.IsEmpty(Parser.StringToObject("[]", GetType(Double?())))
+    End Sub
+
+    <Test> Public Sub ParseTypedObjectArrayPreservesNullsAndPositions()
+        Dim types = {GetType(Nullable(Of Double)), GetType(Nullable(Of Double)), GetType(String)}
+        Dim values = Parser.StringToObjects("[null,1e2,""end""]", types)
+
+        CollectionAssert.AreEqual(New Object() {Nothing, 100.0, "end"}, values)
+        CollectionAssert.IsEmpty(Parser.StringToObjects("[]", types))
+    End Sub
+
+    <Test> Public Sub ParseObjectArrayPreservesNullElements()
+        Dim values = Parser.StringToObject(Of List(Of Person))("[null,{""Navn"":""Test""},null]")
+        Assert.AreEqual(3, values.Count)
+        Assert.IsNull(values(0))
+        Assert.AreEqual("Test", values(1).Navn)
+        Assert.IsNull(values(2))
     End Sub
 
     <Test> Public Sub ParseObjectWithPropertyThatsNotInClass()
@@ -43,7 +253,7 @@ Imports NUnit.Framework
 
     <Test> Public Sub ParseTextWithEscapeObject()
         Dim p = Parser.StringToObject(Of Person)("{""Navn"":""Petter\nGjermund\\ \""Han er skikkelig tøff\"" ""}")
-        Assert.AreEqual("Petter" & vbCrLf & "Gjermund\ ""Han er skikkelig tøff"" ", p.Navn)
+        Assert.AreEqual("Petter" & Environment.NewLine & "Gjermund\ ""Han er skikkelig tï¿½ff"" ", p.Navn)
         'Assert.AreEqual(43, p.Alder)
     End Sub
 
@@ -316,6 +526,20 @@ Imports NUnit.Framework
         Public Data As IDictionary
     End Class
 
+
+    Public Class MemberLookupBase
+        Public Property Value As Integer
+    End Class
+
+    Public Class MemberLookupTarget
+        Inherits MemberLookupBase
+
+        Public ReadOnly Property Unused As String
+            Get
+                Return "unused"
+            End Get
+        End Property
+    End Class
 
     Public Class MissingFieldClass
         Public KnownField As Integer

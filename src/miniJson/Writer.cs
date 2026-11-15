@@ -19,20 +19,20 @@ namespace miniJson
 
         public static string ObjectToString(object o)
         {
-            var result = new StreamWriter(new MemoryStream(), System.Text.Encoding.UTF8);
-            ObjectToString(result, o);
-            result.Flush();
-            result.BaseStream.Position = 0;
-            return new StreamReader(result.BaseStream).ReadToEnd();
+            using (var result = new StringWriter())
+            {
+                ObjectToString(result, o);
+                return Utf8Text.Normalize(result.ToString());
+            }
         }
 
-        private static MethodInfo writeToStreamMethodInfo = typeof(StreamWriter).GetMethod("Write", new Type[] { typeof(string) });
+        private static MethodInfo writeToStreamMethodInfo = typeof(TextWriter).GetMethod("Write", new Type[] { typeof(string) });
         private static MethodInfo writeValueMethodInfo = typeof(Writer).GetMethod("WriteValue", BindingFlags.NonPublic | BindingFlags.Static);
 
-        private static Action<StreamWriter, object> Serializer(Type objType)
+        private static Action<TextWriter, object> Serializer(Type objType)
         {
             List<Expression> exprns = new List<Expression>();
-            var writer = Expression.Parameter(typeof(StreamWriter));
+            var writer = Expression.Parameter(typeof(TextWriter));
             var valueObject = Expression.Parameter(typeof(object));
 
             exprns.Add(Expression.Call(writer, writeToStreamMethodInfo, Expression.Constant("{")));
@@ -88,7 +88,7 @@ namespace miniJson
 
             var block = Expression.Block(exprns.ToArray());
 
-            Expression<Action<StreamWriter, object>> expression1 = Expression.Lambda<Action<StreamWriter, object>>(block, writer, valueObject);
+            Expression<Action<TextWriter, object>> expression1 = Expression.Lambda<Action<TextWriter, object>>(block, writer, valueObject);
             expression1.Reduce();
             return expression1.Compile();
         }
@@ -166,9 +166,9 @@ namespace miniJson
             return t.GetType().FullName;
         }
 
-        private delegate void MyWriter(StreamWriter writer, object value);
+        private delegate void MyWriter(TextWriter writer, object value);
 
-        private static void ObjectToString(StreamWriter result, object o)
+        private static void ObjectToString(TextWriter result, object o)
         {
             if (o == null)
             {
@@ -176,9 +176,9 @@ namespace miniJson
                 return;
             }
 
-            if (Formatters.ContainsKey(o.GetType()))
+            if (Formatters.TryGetValue(o.GetType(), out var formatter))
             {
-                Formatters[o.GetType()](result, o);
+                formatter(result, o);
             }
             else
             {
@@ -195,11 +195,9 @@ namespace miniJson
                     WriteObject(result, o);
                 }
             }
-
-            result.Flush();
         }
 
-        private static void WriteDictionary(StreamWriter result, object o)
+        private static void WriteDictionary(TextWriter result, object o)
         {
             result.Write("{");
             bool first = true;
@@ -236,11 +234,11 @@ namespace miniJson
             return typeinfoCache[t];
         }
 
-        private static Dictionary<Type, Action<StreamWriter, object>> funcCache = new Dictionary<Type, Action<StreamWriter, object>>();
+        private static Dictionary<Type, Action<TextWriter, object>> funcCache = new Dictionary<Type, Action<TextWriter, object>>();
 
         private static object funcCacheLock = new object();
 
-        private static void WriteObject(StreamWriter result, object o)
+        private static void WriteObject(TextWriter result, object o)
         {
             if (!funcCache.ContainsKey(o.GetType()))
             {
@@ -257,7 +255,7 @@ namespace miniJson
             return;
         }
 
-        private static void WriteList(StreamWriter result, object o)
+        private static void WriteList(TextWriter result, object o)
         {
             bool first = true;
             result.Write("[");
@@ -273,7 +271,7 @@ namespace miniJson
             result.Write("]");
         }
 
-        private static void WriteValue(StreamWriter writer, object value)
+        private static void WriteValue(TextWriter writer, object value)
         {
             if (value == null)
             {
@@ -289,9 +287,9 @@ namespace miniJson
                 value = Convert.ChangeType(value, t);
             }
 
-            if (Formatters.ContainsKey(t))
+            if (Formatters.TryGetValue(t, out var formatter))
             {
-                Formatters[t](writer, value);
+                formatter(writer, value);
             }
             else
             {
@@ -313,62 +311,49 @@ namespace miniJson
             }
         }
 
-        private static void WriteDictionary(StreamWriter writer, Type t, IDictionary value)
+        private static void WriteDictionary(TextWriter writer, Type t, IDictionary value)
         {
         }
 
-        private static readonly int[] ToEscape = {
-            0x22,
-            0x2,
-            0x5c
-        };
-
-        private static Dictionary<int, string> Translate = new Dictionary<int, string> {
-            {
-                0x9,
-                "\\t"
-            },
-            {
-                0xa,
-                "\\n"
-            },
-            {
-                0xc,
-                "\\f"
-            },
-            {
-                0xd,
-                "\\r"
-            }
-        };
-
-        private static void Writetext(StreamWriter writer, object value)
+        private static void Writetext(TextWriter writer, object value)
         {
             writer.Write((char)0x22);
             foreach (var c in value.ToString())
             {
-                if (ToEscape.Contains((int)c))
+                switch (c)
                 {
-                    writer.Write("\\");
-                }
-                if (Translate.ContainsKey((int)c))
-                {
-                    writer.Write(Translate[(int)c]);
-                }
-                else
-                {
-                    writer.Write(c);
+                    case '"':
+                    case '\\':
+                    case '\u0002':
+                        writer.Write('\\');
+                        writer.Write(c);
+                        break;
+                    case '\t':
+                        writer.Write("\\t");
+                        break;
+                    case '\n':
+                        writer.Write("\\n");
+                        break;
+                    case '\f':
+                        writer.Write("\\f");
+                        break;
+                    case '\r':
+                        writer.Write("\\r");
+                        break;
+                    default:
+                        writer.Write(c);
+                        break;
                 }
             }
             writer.Write((char)0x22);
         }
 
-        private static void WriteNumber(StreamWriter w, object val)
+        private static void WriteNumber(TextWriter w, object val)
         {
             w.Write(val.ToString().Replace(',', '.'));
         }
 
-        private static void WriteDate(StreamWriter w, object value)
+        private static void WriteDate(TextWriter w, object value)
         {
             System.DateTime d = (System.DateTime)value;
             w.Write((char)34);

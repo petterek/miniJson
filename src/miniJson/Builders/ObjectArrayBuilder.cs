@@ -50,31 +50,17 @@ namespace miniJson.Builders
             var list = new List<object>();
 
 
-            do
+            if (nextChar.Current() != TokenAcceptors.ListEnd)
             {
-                var strategy = i >= types.Length
-                    ? objectStrategy
-                    : strategies[i];
-
-                if (strategy.InnerType.IsValueType | strategy.InnerType == typeof(string))
+                do
                 {
-                    TokenAcceptors.WhiteSpace(nextChar);
-                    if (nextChar.Peek() != TokenAcceptors.ListEnd)
-                    {
-                        list.Add(TokenAcceptors.TypeParserMapper[strategy.InnerType].Parse(nextChar, t));
-                    }
-                }
-                else
-                {
-                    object v = Parser.StringToObject(nextChar, strategy.InnerType);
-                    if (v != null)
-                    {
-                        list.Add(v);
-                    }
-                }
-
-                i++;
-            } while (TokenAcceptors.CanFindValueSeparator(nextChar));
+                    var strategy = i >= types.Length
+                        ? objectStrategy
+                        : strategies[i];
+                    list.Add(TokenAcceptors.ParseValue(strategy.InnerType, nextChar));
+                    i++;
+                } while (TokenAcceptors.CanFindValueSeparator(nextChar));
+            }
 
             TokenAcceptors.EatUntil(TokenAcceptors.ListEnd, nextChar);
 

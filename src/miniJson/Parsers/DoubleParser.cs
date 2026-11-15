@@ -9,9 +9,7 @@ namespace miniJson.Parsers
     {
         public override object Parse(IReader nextChar, Type t)
         {
-            TokenAcceptors.WhiteSpace(nextChar);
-            TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789.-");
-            return double.Parse(nextChar.Buffer, CultureInfo.InvariantCulture.NumberFormat);
+            return double.Parse(TokenAcceptors.Number(nextChar), NumberStyles.Float, CultureInfo.InvariantCulture);
         }
     }
 
@@ -19,9 +17,7 @@ namespace miniJson.Parsers
     {
         public override object Parse(IReader nextChar, Type t)
         {
-            TokenAcceptors.WhiteSpace(nextChar);
-            TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789.-");
-            return float.Parse(nextChar.Buffer, CultureInfo.InvariantCulture.NumberFormat);
+            return float.Parse(TokenAcceptors.Number(nextChar), NumberStyles.Float, CultureInfo.InvariantCulture);
         }
     }
     
@@ -29,9 +25,7 @@ namespace miniJson.Parsers
     {
         public override object Parse(IReader nextChar, Type t)
         {
-            TokenAcceptors.WhiteSpace(nextChar);
-            TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789.-");
-            return decimal.Parse(nextChar.Buffer, CultureInfo.InvariantCulture.NumberFormat);
+            return decimal.Parse(TokenAcceptors.Number(nextChar), NumberStyles.Float, CultureInfo.InvariantCulture);
         }
     }
 }

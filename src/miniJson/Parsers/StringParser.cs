@@ -1,182 +1,91 @@
 using miniJson.Builders;
 using miniJson.Stream;
 using System;
-using System.Collections.Generic;
+using System.Text;
 
 namespace miniJson.Parsers
 {
     internal class StringParser : Builder
-
     {
-        public delegate string TransformText(IReader reader);
-
-        public delegate bool Match(string input);
-
-        private static readonly MatchList ML = new MatchList {
-            {
-                inp => inp == "\\\\",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return "\\";
-                }
-            },
-            {
-                inp => inp == "\\\"",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return '"'.ToString();
-                }
-            },
-            {
-                inp => inp == "\\n",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return System.Environment.NewLine;
-                }
-            },
-            {
-                inp => inp == "\\t",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return ((char)9).ToString();
-                }
-            },
-            {
-                inp => inp == "\\/",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return "/";
-                }
-            },
-            {
-                inp => inp == "\\b",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return ((char)8).ToString();
-                }
-            },
-            {
-                inp => inp == "\\f",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return ((char)12).ToString();
-                }
-            },
-            {
-                inp => inp == "\\r",
-                (IReader r) =>
-                {
-                    r.ClearBuffer();
-                    return ((char)13).ToString();
-                }
-            },
-            {
-                (string inp) =>
-                {
-                    if (inp.StartsWith("\\u")) {
-                        for (var x = 1; x <= inp.Length; x++) {
-                            if ((int)inp[x] < 48 || (int)inp[x] > 57) {
-                                return false;
-                            }
-                        }
-                    }
-                    return false;
-                },
-                (IReader r) =>
-                {
-                    object toTrans = r.Buffer;
-                    return "";
-					//ChrW()
-				}
-            }
-        };
-
         public override object Parse(IReader nextChar, Type t)
         {
-            System.Text.StringBuilder buffer = new System.Text.StringBuilder();
             TokenAcceptors.WhiteSpace(nextChar);
-
             if (TokenAcceptors.QuoteOrNull(nextChar) == null)
             {
                 return null;
             }
 
-            var cur = nextChar.PeekToBuffer().ToString();
-            while (cur != TokenAcceptors.Hyphen.ToString())
+            StringBuilder buffer = null;
+            nextChar.BufferString();
+            while (nextChar.Current() != TokenAcceptors.Hyphen)
             {
-                //Not allowed, is the start of an escape
-                if (cur == "\\")
+                if (buffer == null)
                 {
-                    buffer.Append(nextChar.Buffer);
-
-                    cur = nextChar.PeekToBuffer().ToString();
-
-                    if (cur == "\\65000") throw new System.IO.EndOfStreamException();
-
-                    while (ML.ContainsKey(nextChar.BufferPeek))
-                    {
-                        cur = nextChar.PeekToBuffer().ToString();
-                    }
-
-                    buffer.Append(ML[nextChar.BufferPreLastPeek](nextChar));
+                    buffer = new StringBuilder();
                 }
-                else
+                buffer.Append(nextChar.BufferSpan);
+                switch (ReadCharacter(nextChar))
                 {
-                    cur = nextChar.PeekToBuffer().ToString();
+                    case '\\': buffer.Append('\\'); break;
+                    case '"': buffer.Append('"'); break;
+                    case '/': buffer.Append('/'); break;
+                    case 'b': buffer.Append('\b'); break;
+                    case 'f': buffer.Append('\f'); break;
+                    case 'n': buffer.Append(Environment.NewLine); break;
+                    case 'r': buffer.Append('\r'); break;
+                    case 't': buffer.Append('\t'); break;
+                    case 'u': buffer.Append(ReadUnicodeEscape(nextChar)); break;
+                    default: throw new FormatException("Invalid JSON string escape.");
                 }
+                nextChar.ClearBuffer();
+                nextChar.Read();
+                nextChar.BufferString();
             }
-            buffer.Append(nextChar.Buffer);
+            var tail = nextChar.Buffer;
             TokenAcceptors.Quote(nextChar);
-
+            if (buffer == null)
+            {
+                return tail;
+            }
+            buffer.Append(tail);
             return buffer.ToString();
         }
 
-        private class MatchList : Dictionary<Match, TransformText>
+        private static char ReadUnicodeEscape(IReader reader)
         {
-            public bool ContainsKey(string s)
+            var value = 0;
+            for (var index = 0; index < 4; index++)
             {
-                foreach (var key in this.Keys)
+                var character = ReadCharacter(reader);
+                int digit;
+                if (character >= '0' && character <= '9')
                 {
-                    if (key(s))
-                    {
-                        return true;
-                    }
+                    digit = character - '0';
                 }
-                return false;
+                else if (character >= 'a' && character <= 'f')
+                {
+                    digit = character - 'a' + 10;
+                }
+                else if (character >= 'A' && character <= 'F')
+                {
+                    digit = character - 'A' + 10;
+                }
+                else
+                {
+                    throw new FormatException("Unicode escapes must contain four hexadecimal digits.");
+                }
+                value = (value << 4) | digit;
             }
+            return (char)value;
+        }
 
-            public TransformText this[string s]
+        private static char ReadCharacter(IReader reader)
+        {
+            if (!reader.TryPeekToBuffer(out var value))
             {
-                get
-                {
-                    foreach (var i in this)
-                    {
-                        if (i.Key(s))
-                        {
-                            return i.Value;
-                        }
-                    }
-                    throw new KeyNotFoundException();
-                }
-                set
-                {
-                    foreach (var i in this)
-                    {
-                        if (i.Key(s))
-                        {
-                            //i.Value = value
-                        }
-                    }
-                    throw new KeyNotFoundException();
-                }
+                throw new System.IO.EndOfStreamException("Unexpected end of JSON string.");
             }
+            return value;
         }
     }
 }

@@ -11,22 +11,12 @@ namespace miniJson
     {
         public static T StringToObject<T>(string input) where T : new()
         {
-            MemoryStream mem = new MemoryStream();
-            StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
-            write.Write(input);
-            write.Flush();
-            write.BaseStream.Position = 0;
-            return StringToObject<T>(new StreamReader(mem, System.Text.Encoding.UTF8));
+            return (T)StringToObject(input, typeof(T));
         }
 
         public static object[] StringToObjects(string input, Type[] types)
         {
-            MemoryStream mem = new MemoryStream();
-            StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
-            write.Write(input);
-            write.Flush();
-            write.BaseStream.Position = 0;
-            return StringToObjects(new ReadStream(new StreamReader(mem, System.Text.Encoding.UTF8)), types);
+            return StringToObjects(new ReadString(Utf8Text.Normalize(input)), types);
         }
 
         public static object[] StringToObjects(System.IO.Stream input, Type[] types)
@@ -36,12 +26,7 @@ namespace miniJson
 
         public static object StringToObject(string input, System.Type type)
         {
-            MemoryStream mem = new MemoryStream();
-            StreamWriter write = new StreamWriter(mem, System.Text.Encoding.UTF8);
-            write.Write(input);
-            write.Flush();
-            write.BaseStream.Position = 0;
-            return StringToObject(new ReadStream(new StreamReader(mem, System.Text.Encoding.UTF8)), type);
+            return StringToObject(new ReadString(Utf8Text.Normalize(input)), type);
         }
 
         //Here we can add another function that accepts stream as parameter
@@ -81,9 +66,9 @@ namespace miniJson
             //we are trying to create something that is an interface. The we must guess what to create :)
             //This should boil down to IEnumerable of something.. :)
 
-            if (TokenAcceptors.TypeParserMapper.ContainsKey(type))
+            if (TokenAcceptors.TypeParserMapper.TryGetValue(type, out var parser))
             {
-                return TokenAcceptors.TypeParserMapper[type].Parse(input, type);
+                return parser.Parse(input, type);
             }
             else if (type.IsGenericType && object.ReferenceEquals(type.GetGenericTypeDefinition(), typeof(IEnumerable<>)))
             {

@@ -10,7 +10,7 @@ namespace miniJson.Parsers
         {
             TokenAcceptors.WhiteSpace(nextChar);
             TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789");
-            var toParse = nextChar.Buffer;
+            var toParse = nextChar.BufferSpan;
 
             return byte.Parse(toParse);
         }

@@ -2,6 +2,7 @@ using miniJson.Builders;
 using miniJson.Parsers;
 using miniJson.Stream;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -20,6 +21,7 @@ namespace miniJson
         public const char Hyphen = '"';
 
         public static Type BuilderFactory = typeof(ObjectBuilder);
+        private static readonly object ValuePresent = new object();
 
         public static void EatUntil(char c, IReader nextChar)
         {
@@ -49,11 +51,11 @@ namespace miniJson
 
         public static void WhiteSpace(IReader nextchar)
         {
-            if (Convert.ToInt32(nextchar.Current()) > 32)
+            if (nextchar.Current() > 32)
             {
                 return;
             }
-            while (Convert.ToInt32(nextchar.Peek()) <= 32)
+            while (nextchar.Peek() <= 32)
             {
                 nextchar.Read();
             }
@@ -85,7 +87,7 @@ namespace miniJson
         {
             if (Quote(nextChar))
             {
-                return new object();
+                return ValuePresent;
             }
 
             TokenAcceptors.BufferLegalCharacters(nextChar, "NULnul");
@@ -103,7 +105,7 @@ namespace miniJson
             if (nextChar.Current() == ObjectStart)
             {
                 nextChar.Read();
-                return new object();
+                return ValuePresent;
             }
             else
             {
@@ -130,8 +132,7 @@ namespace miniJson
 
         public static string Attribute(IReader nextChar)
         {
-            var stringP = new StringParser();
-            return (string)stringP.Parse(nextChar, null);
+            return (string)TypeParserMapper[typeof(string)].Parse(nextChar, null);
         }
 
         public static void Attributes(ref object result, IReader nextChar)
@@ -140,73 +141,92 @@ namespace miniJson
             //Cleaning out whitespace, check for " to ensure not empty object
             if (nextChar.Current() == Hyphen)
             {
+                var resultType = result.GetType();
+                var members = parserCache.GetOrAdd(resultType,
+                    static _ => new ConcurrentDictionary<string, MemberParser>(StringComparer.Ordinal));
                 do
                 {
-                    var name = Attribute(nextChar);
+                    WhiteSpace(nextChar);
+                    ReadOnlySpan<char> name;
+                    if (nextChar is ReadString text && text.TryReadUnescapedString(out var rawName))
+                    {
+                        name = rawName;
+                    }
+                    else
+                    {
+                        var decodedName = Attribute(nextChar);
+                        if (decodedName == null)
+                        {
+                            throw new FormatException("Expected a JSON member name.");
+                        }
+                        name = decodedName.AsSpan();
+                    }
                     EatUntil(Qualifier, nextChar);
-                    CreateAttributeValue(nextChar, ref result, name);
+                    CreateAttributeValue(nextChar, ref result, resultType, members, name);
                 } while (CanFindValueSeparator(nextChar));
             }
         }
 
-        private static Dictionary<string, (Type parser, Type fieldType, MemberInfo field, Func<object, object, object> setter)> parserCache = new Dictionary<string, (Type, Type, MemberInfo, Func<object, object, object>)>();
-
-        private static void CreateAttributeValue(IReader nextChar, ref object result, string name)
+        private sealed class MemberParser
         {
-            Type resultType = result.GetType();
-            var key = $"{resultType.FullName}-{name}";
+            public Type ParserType;
+            public Type FieldType;
+            public Func<object, object, object> Setter;
+        }
 
-            if (!parserCache.ContainsKey(key))
+        private static readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, MemberParser>> parserCache =
+            new ConcurrentDictionary<Type, ConcurrentDictionary<string, MemberParser>>();
+
+        private static MemberParser CreateMemberParser(string name, Type resultType)
+        {
+            Type fieldType = typeof(UnknownFieldParser);
+            Type parserType = null;
+            MemberInfo field = null;
+            var memberInfo = resultType.GetMember(name);
+            if (memberInfo.Length != 0)
             {
-                lock (parserCache)
-                {
-                    if (!parserCache.ContainsKey(key))
-                    {
-                        //maybe generate all setters for the given type the first time it si encountered
-                        Type fType = null;
-                        Type parserType = null;
-                        MemberInfo fInfo = null;
+                field = memberInfo[0];
+                fieldType = field.MemberType == MemberTypes.Property
+                    ? resultType.GetProperty(name).PropertyType
+                    : resultType.GetField(name).FieldType;
+            }
+            if (fieldType.IsEnum)
+            {
+                parserType = typeof(EnumParser);
+            }
+            if (Nullable.GetUnderlyingType(fieldType) != null)
+            {
+                parserType = typeof(NullableParser);
+            }
+            return new MemberParser
+            {
+                ParserType = parserType,
+                FieldType = fieldType,
+                Setter = SetterCreator.CreateValueTypeSetter(field)
+            };
+        }
 
-                        MemberInfo[] memberInfo = resultType.GetMember(name);
-                        if (memberInfo.Length != 0)
-                        {
-                            fInfo = memberInfo[0];
-                            if (fInfo.MemberType == MemberTypes.Property)
-                            {
-                                fType = resultType.GetProperty(name).PropertyType;
-                            }
-                            else
-                            {
-                                fType = resultType.GetField(name).FieldType;
-                            }
-                        }
-
-                        if (fInfo == null) { fType = typeof(UnknownFieldParser); }
-                        if (fType.IsEnum) { parserType = typeof(EnumParser); }
-                        if (fType.IsGenericType && object.ReferenceEquals(fType.GetGenericTypeDefinition(), typeof(Nullable<>))) { parserType = typeof(NullableParser); }
-
-                        parserCache.Add(key, (parserType, fType, fInfo, SetterCreator.CreateValueTypeSetter(fInfo)));
-                    }
-                }
+        private static void CreateAttributeValue(IReader nextChar, ref object result, Type resultType,
+            ConcurrentDictionary<string, MemberParser> members, ReadOnlySpan<char> name)
+        {
+            if (!members.GetAlternateLookup<ReadOnlySpan<char>>().TryGetValue(name, out var info))
+            {
+                info = members.GetOrAdd(name.ToString(), static (key, type) => CreateMemberParser(key, type), resultType);
             }
 
-            var info = parserCache[key];
+            object value = ParseValue(info.FieldType, nextChar, info.ParserType);
 
-            object value = ParseValue(info.fieldType, nextChar, info.parser);
-
-            if (info.field != null)
+            if (info.Setter != null)
             {
                 if (resultType.IsValueType)
                 {
-                    result = info.setter(result, value);
+                    result = info.Setter(result, value);
                 }
                 else
                 {
-                    info.setter(result, value);
+                    info.Setter(result, value);
                 }
             }
-
-            //fInfo.SetValue(result, value)
         }
 
         public static object ParseValue(Type t, IReader nextChar, Type parserType = null)
@@ -218,10 +238,14 @@ namespace miniJson
             {
                 useParser = parserType;
             }
-
-            if (TypeParserMapper.ContainsKey(useParser))
+            else if (Nullable.GetUnderlyingType(t) != null)
             {
-                value = TypeParserMapper[useParser].Parse(nextChar, t);
+                useParser = typeof(NullableParser);
+            }
+
+            if (TypeParserMapper.TryGetValue(useParser, out var parser))
+            {
+                value = parser.Parse(nextChar, t);
             }
             else
             {
@@ -230,10 +254,84 @@ namespace miniJson
             return value;
         }
 
+        public static ReadOnlySpan<char> Number(IReader nextChar)
+        {
+            WhiteSpace(nextChar);
+            BufferLegalCharacters(nextChar, "0123456789.+-eE");
+            var number = nextChar.BufferSpan;
+            if (!IsJsonNumber(number))
+            {
+                throw new FormatException("Invalid JSON number: " + number.ToString());
+            }
+            return number;
+        }
+
+        private static bool IsJsonNumber(ReadOnlySpan<char> number)
+        {
+            var index = 0;
+            if (index < number.Length && number[index] == '-')
+            {
+                index++;
+            }
+            if (index == number.Length)
+            {
+                return false;
+            }
+            if (number[index] == '0')
+            {
+                index++;
+            }
+            else
+            {
+                if (number[index] < '1' || number[index] > '9')
+                {
+                    return false;
+                }
+                while (index < number.Length && char.IsAsciiDigit(number[index]))
+                {
+                    index++;
+                }
+            }
+            if (index < number.Length && number[index] == '.')
+            {
+                var fractionStart = ++index;
+                while (index < number.Length && char.IsAsciiDigit(number[index]))
+                {
+                    index++;
+                }
+                if (index == fractionStart)
+                {
+                    return false;
+                }
+            }
+            if (index < number.Length && (number[index] == 'e' || number[index] == 'E'))
+            {
+                index++;
+                if (index < number.Length && (number[index] == '+' || number[index] == '-'))
+                {
+                    index++;
+                }
+                var exponentStart = index;
+                while (index < number.Length && char.IsAsciiDigit(number[index]))
+                {
+                    index++;
+                }
+                if (index == exponentStart)
+                {
+                    return false;
+                }
+            }
+            return index == number.Length;
+        }
+
         public static void BufferLegalCharacters(IReader nextChar, string leagal)
         {
-            var toArray = leagal.ToArray();
-            while (toArray.Contains(nextChar.Peek()))
+            if (nextChar is ReadString text)
+            {
+                text.BufferLegalCharacters(leagal);
+                return;
+            }
+            while (leagal.IndexOf(nextChar.Peek()) >= 0)
             {
                 nextChar.PeekToBuffer();
             }

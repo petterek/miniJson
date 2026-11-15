@@ -22,6 +22,40 @@ End Module
 
     End Sub
 
+    <Test> Public Sub BufferedNestedUnicodePayloadIsWrittenToStringAndStream()
+        Dim text = New String("x"c, 128) & Char.ConvertFromUtf32(&H1D11E) & """\" & vbLf
+        Dim value = New With {
+            .Items = Enumerable.Range(1, 100).Select(Function(i) New With {.Id = i, .Text = text}).ToArray()
+        }
+        Dim expected = Newtonsoft.Json.JsonConvert.SerializeObject(value)
+
+        Assert.AreEqual(expected, Writer.ObjectToString(value))
+        Using stream = New System.IO.MemoryStream()
+            Writer.ObjectToString(stream, value)
+            Assert.AreEqual(expected, System.Text.Encoding.UTF8.GetString(stream.ToArray()))
+            Assert.IsTrue(stream.CanWrite)
+        End Using
+    End Sub
+
+    <TestCase("D800", "FFFD"),
+        TestCase("DC00", "FFFD"),
+        TestCase("D800 0078 DC00", "FFFD 0078 FFFD"),
+        TestCase("D834 DD1E", "D834 DD1E")>
+    Public Sub StringOutputPreservesUtf8SurrogateReplacement(inputUnits As String, expectedUnits As String)
+        Dim input = New String(inputUnits.Split(" "c).Select(Function(unit) ChrW(Convert.ToInt32(unit, 16))).ToArray())
+        Dim expected = New String(expectedUnits.Split(" "c).Select(Function(unit) ChrW(Convert.ToInt32(unit, 16))).ToArray())
+        Dim expectedJson = """" & expected & """"
+        Assert.AreEqual(expectedJson, Writer.ObjectToString(input))
+        Using stream = New System.IO.MemoryStream()
+            If inputUnits = expectedUnits Then
+                Writer.ObjectToString(stream, input)
+                Assert.AreEqual(expectedJson, System.Text.Encoding.UTF8.GetString(stream.ToArray()))
+            Else
+                Assert.Throws(Of System.Text.EncoderFallbackException)(Sub() Writer.ObjectToString(stream, input))
+            End If
+        End Using
+    End Sub
+
     <Test> Public Sub ParseStringWithObjectToString()
         Dim testString = <![CDATA[<h3>{0}</h3>
                 <p>Man skal ha en samtale med den syke allerede f&oslash;rste frav&aelig;rsdag. Dette gjelder b&aring;de n&aring;r den syke leverer egenmelding og ved sykmelding. Avklar forventet lengde p&aring; frav&aelig;ret og hvilke arbeidsoppgaver er den ansatte i stand til &aring; utf&oslash;re/ikke utf&oslash;re:</p>

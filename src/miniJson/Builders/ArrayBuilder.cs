@@ -30,25 +30,13 @@ namespace miniJson.Builders
 
             TokenAcceptors.WhiteSpace(nextChar);
 
-            do
+            if (nextChar.Current() != TokenAcceptors.ListEnd)
             {
-                if (strategy.InnerType.IsValueType | strategy.InnerType == typeof(string))
+                do
                 {
-                    TokenAcceptors.WhiteSpace(nextChar);
-                    if (nextChar.Peek() != TokenAcceptors.ListEnd)
-                    {
-                        strategy.ItemList.Add(TokenAcceptors.TypeParserMapper[strategy.InnerType].Parse(nextChar, t));
-                    }
-                }
-                else
-                {
-                    object v = Parser.StringToObject(nextChar, strategy.InnerType);
-                    if (v != null)
-                    {
-                        strategy.ItemList.Add(v);
-                    }
-                }
-            } while (TokenAcceptors.CanFindValueSeparator(nextChar));
+                    strategy.ItemList.Add(TokenAcceptors.ParseValue(strategy.InnerType, nextChar));
+                } while (TokenAcceptors.CanFindValueSeparator(nextChar));
+            }
 
             TokenAcceptors.EatUntil(TokenAcceptors.ListEnd, nextChar);
             
