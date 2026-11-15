@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace miniJson
 {
@@ -142,8 +143,7 @@ namespace miniJson
             if (nextChar.Current() == Hyphen)
             {
                 var resultType = result.GetType();
-                var members = parserCache.GetOrAdd(resultType,
-                    static _ => new ConcurrentDictionary<string, MemberParser>(StringComparer.Ordinal));
+                var members = GetMembers(resultType);
                 do
                 {
                     WhiteSpace(nextChar);
@@ -169,26 +169,118 @@ namespace miniJson
 
         private sealed class MemberParser
         {
+            public string Name;
             public Type ParserType;
             public Type FieldType;
             public Func<object, object, object> Setter;
         }
 
-        private static readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, MemberParser>> parserCache =
-            new ConcurrentDictionary<Type, ConcurrentDictionary<string, MemberParser>>();
+        private static readonly ConcurrentDictionary<Type, MemberCache> parserCache =
+            new ConcurrentDictionary<Type, MemberCache>();
+
+        private sealed class MemberCache
+        {
+            private MemberParser[] entries = Array.Empty<MemberParser>();
+
+            public MemberParser Get(Type type, ReadOnlySpan<char> name)
+            {
+                var snapshot = Volatile.Read(ref entries);
+                var index = Find(snapshot, name);
+                if (index >= 0)
+                {
+                    return snapshot[index];
+                }
+                lock (this)
+                {
+                    snapshot = entries;
+                    index = Find(snapshot, name);
+                    if (index >= 0)
+                    {
+                        return snapshot[index];
+                    }
+                    var info = CreateMemberParser(name.ToString(), type);
+                    var insertion = ~index;
+                    var updated = new MemberParser[snapshot.Length + 1];
+                    Array.Copy(snapshot, 0, updated, 0, insertion);
+                    updated[insertion] = info;
+                    Array.Copy(snapshot, insertion, updated, insertion + 1, snapshot.Length - insertion);
+                    Volatile.Write(ref entries, updated);
+                    return info;
+                }
+            }
+
+            private static int Find(MemberParser[] snapshot, ReadOnlySpan<char> name)
+            {
+                var low = 0;
+                var high = snapshot.Length - 1;
+                while (low <= high)
+                {
+                    var middle = low + (high - low) / 2;
+                    var comparison = name.CompareTo(snapshot[middle].Name.AsSpan(), StringComparison.OrdinalIgnoreCase);
+                    if (comparison == 0)
+                    {
+                        return middle;
+                    }
+                    if (comparison < 0)
+                    {
+                        high = middle - 1;
+                    }
+                    else
+                    {
+                        low = middle + 1;
+                    }
+                }
+                return ~low;
+            }
+        }
+
+        private static MemberCache GetMembers(Type type) =>
+            parserCache.GetOrAdd(type, static _ => new MemberCache());
+
+        internal static void ReadUnknownMember(IReader input, object target, ReadOnlySpan<char> name)
+        {
+            var type = target.GetType();
+            CreateAttributeValue(input, ref target, type, GetMembers(type), name);
+        }
+
+        internal static void ReadUnknownMember(IReader input, Type type, ReadOnlySpan<char> name)
+        {
+            var info = GetMemberParser(type, GetMembers(type), name);
+            ParseValue(info.FieldType, input, info.ParserType);
+        }
 
         private static MemberParser CreateMemberParser(string name, Type resultType)
         {
             Type fieldType = typeof(UnknownFieldParser);
             Type parserType = null;
             MemberInfo field = null;
-            var memberInfo = resultType.GetMember(name);
-            if (memberInfo.Length != 0)
+            MemberInfo otherMember = null;
+            var memberInfo = resultType.GetMember(name,
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.IgnoreCase);
+            foreach (var member in memberInfo)
             {
-                field = memberInfo[0];
-                fieldType = field.MemberType == MemberTypes.Property
-                    ? resultType.GetProperty(name).PropertyType
-                    : resultType.GetField(name).FieldType;
+                if (!string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (member is PropertyInfo || member is FieldInfo)
+                {
+                    if (field != null)
+                    {
+                        throw new AmbiguousMatchException("Ambiguous JSON member '" + name + "' on '" + resultType.FullName + "'.");
+                    }
+                    field = member;
+                }
+                else
+                {
+                    otherMember ??= member;
+                }
+            }
+            field ??= otherMember;
+            if (field != null)
+            {
+                fieldType = field is PropertyInfo property ? property.PropertyType :
+                    field is FieldInfo publicField ? publicField.FieldType : resultType.GetField(field.Name).FieldType;
             }
             if (fieldType.IsEnum)
             {
@@ -200,20 +292,20 @@ namespace miniJson
             }
             return new MemberParser
             {
+                Name = name,
                 ParserType = parserType,
                 FieldType = fieldType,
                 Setter = SetterCreator.CreateValueTypeSetter(field)
             };
         }
 
-        private static void CreateAttributeValue(IReader nextChar, ref object result, Type resultType,
-            ConcurrentDictionary<string, MemberParser> members, ReadOnlySpan<char> name)
-        {
-            if (!members.GetAlternateLookup<ReadOnlySpan<char>>().TryGetValue(name, out var info))
-            {
-                info = members.GetOrAdd(name.ToString(), static (key, type) => CreateMemberParser(key, type), resultType);
-            }
+        private static MemberParser GetMemberParser(Type resultType,
+            MemberCache members, ReadOnlySpan<char> name) => members.Get(resultType, name);
 
+        private static void CreateAttributeValue(IReader nextChar, ref object result, Type resultType,
+            MemberCache members, ReadOnlySpan<char> name)
+        {
+            var info = GetMemberParser(resultType, members, name);
             object value = ParseValue(info.FieldType, nextChar, info.ParserType);
 
             if (info.Setter != null)
@@ -257,71 +349,27 @@ namespace miniJson
         public static ReadOnlySpan<char> Number(IReader nextChar)
         {
             WhiteSpace(nextChar);
-            BufferLegalCharacters(nextChar, "0123456789.+-eE");
-            var number = nextChar.BufferSpan;
-            if (!IsJsonNumber(number))
+            ReadOnlySpan<char> number;
+            bool valid;
+            if (nextChar is ReadString text && text.TryReadNumber(out number, out valid))
+            {
+                if (!valid)
+                {
+                    throw new FormatException("Invalid JSON number: " + number.ToString());
+                }
+                return number;
+            }
+            while (JsonNumber.IsCharacter(nextChar.Peek()))
+            {
+                nextChar.PeekToBuffer();
+            }
+            number = nextChar.BufferSpan;
+            var length = JsonNumber.Scan(number, out valid);
+            if (!valid || length != number.Length)
             {
                 throw new FormatException("Invalid JSON number: " + number.ToString());
             }
             return number;
-        }
-
-        private static bool IsJsonNumber(ReadOnlySpan<char> number)
-        {
-            var index = 0;
-            if (index < number.Length && number[index] == '-')
-            {
-                index++;
-            }
-            if (index == number.Length)
-            {
-                return false;
-            }
-            if (number[index] == '0')
-            {
-                index++;
-            }
-            else
-            {
-                if (number[index] < '1' || number[index] > '9')
-                {
-                    return false;
-                }
-                while (index < number.Length && char.IsAsciiDigit(number[index]))
-                {
-                    index++;
-                }
-            }
-            if (index < number.Length && number[index] == '.')
-            {
-                var fractionStart = ++index;
-                while (index < number.Length && char.IsAsciiDigit(number[index]))
-                {
-                    index++;
-                }
-                if (index == fractionStart)
-                {
-                    return false;
-                }
-            }
-            if (index < number.Length && (number[index] == 'e' || number[index] == 'E'))
-            {
-                index++;
-                if (index < number.Length && (number[index] == '+' || number[index] == '-'))
-                {
-                    index++;
-                }
-                var exponentStart = index;
-                while (index < number.Length && char.IsAsciiDigit(number[index]))
-                {
-                    index++;
-                }
-                if (index == exponentStart)
-                {
-                    return false;
-                }
-            }
-            return index == number.Length;
         }
 
         public static void BufferLegalCharacters(IReader nextChar, string leagal)

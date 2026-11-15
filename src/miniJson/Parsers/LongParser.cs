@@ -8,6 +8,11 @@ namespace miniJson.Parsers
     {
         public override object Parse(IReader nextChar, Type t)
         {
+            return Read(nextChar);
+        }
+
+        internal static long Read(IReader nextChar)
+        {
             TokenAcceptors.WhiteSpace(nextChar);
             TokenAcceptors.BufferLegalCharacters(nextChar, "0123456789-");
             return long.Parse(nextChar.BufferSpan);

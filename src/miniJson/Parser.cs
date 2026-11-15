@@ -14,6 +14,27 @@ namespace miniJson
             return (T)StringToObject(input, typeof(T));
         }
 
+        public static T StringToObject<T>(string input, MiniJsonTypeInfo<T> typeInfo)
+        {
+            if (typeInfo == null)
+            {
+                throw new ArgumentNullException(nameof(typeInfo));
+            }
+            return typeInfo.Deserialize(new ReadString(Utf8Text.Normalize(input)));
+        }
+
+        public static T StringToObject<T>(System.IO.Stream input, MiniJsonTypeInfo<T> typeInfo)
+        {
+            if (typeInfo == null)
+            {
+                throw new ArgumentNullException(nameof(typeInfo));
+            }
+            using (var reader = new StreamReader(input, System.Text.Encoding.UTF8, true, 1024, true))
+            {
+                return typeInfo.Deserialize(new ReadStream(reader));
+            }
+        }
+
         public static object[] StringToObjects(string input, Type[] types)
         {
             return StringToObjects(new ReadString(Utf8Text.Normalize(input)), types);

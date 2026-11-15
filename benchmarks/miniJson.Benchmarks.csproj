@@ -11,6 +11,8 @@
     <PackageReference Include="BenchmarkDotNet" Version="0.16.0-preview.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <ProjectReference Include="../src/miniJson/miniJson.csproj" />
+    <ProjectReference Include="../src/miniJson.SourceGeneration/miniJson.SourceGeneration.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

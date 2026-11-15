@@ -86,8 +86,13 @@ namespace miniJson.Stream
             {
                 return;
             }
-            var offset = input.AsSpan(end).IndexOfAnyExcept(legal.AsSpan());
-            if (offset < 0)
+            var remaining = input.AsSpan(end);
+            var offset = 0;
+            while (offset < remaining.Length && legal.IndexOf(remaining[offset]) >= 0)
+            {
+                offset++;
+            }
+            if (offset == remaining.Length)
             {
                 end = input.Length;
                 endMarkers++;
@@ -96,6 +101,30 @@ namespace miniJson.Stream
             {
                 end += offset + 1;
             }
+        }
+
+        public bool TryReadNumber(out ReadOnlySpan<char> number, out bool valid)
+        {
+            number = default;
+            valid = false;
+            if (endMarkers != 0 || end - start != 1)
+            {
+                return false;
+            }
+            var remaining = input.AsSpan(start);
+            var length = JsonNumber.Scan(remaining, out valid);
+            number = remaining.Slice(0, length);
+            start += length;
+            end = start;
+            if (end < input.Length)
+            {
+                end++;
+            }
+            else
+            {
+                endMarkers++;
+            }
+            return true;
         }
 
         public char Read()

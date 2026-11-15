@@ -61,7 +61,7 @@ Imports NUnit.Framework
     End Sub
 
     <TestCase(False), TestCase(True)>
-    Public Sub MemberLookupPreservesDecodedNamesCaseAndType(useStream As Boolean)
+    Public Sub MemberLookupDecodesNamesIgnoringCaseAndPreservesType(useStream As Boolean)
         Const input = "{""Va\u006cue"":1,""Ignored"":[true,false],""Value"":2,""value"":99}"
         For pass = 1 To 2
             Dim actual As MemberLookupTarget
@@ -72,8 +72,8 @@ Imports NUnit.Framework
             Else
                 actual = Parser.StringToObject(Of MemberLookupTarget)(input)
             End If
-            Assert.AreEqual(2, actual.Value)
-            Assert.AreEqual("text", Parser.StringToObject(Of Holder(Of String))("{""Value"":""text""}").Value)
+            Assert.AreEqual(99, actual.Value)
+            Assert.AreEqual("text", Parser.StringToObject(Of Holder(Of String))("{""value"":""text""}").Value)
         Next
     End Sub
 

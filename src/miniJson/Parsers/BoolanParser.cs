@@ -8,14 +8,19 @@ namespace miniJson.Parsers
     {
         public override object Parse(IReader nextChar, Type t)
         {
+            return Read(nextChar);
+        }
+
+        internal static bool Read(IReader nextChar)
+        {
             TokenAcceptors.WhiteSpace(nextChar);
             TokenAcceptors.BufferLegalCharacters(nextChar, "TtrueFfals");
-            var bufferVal = nextChar.Buffer;
+            var bufferVal = nextChar.BufferSpan;
 
             bool res;
             if (!bool.TryParse(bufferVal, out res))
             {
-                throw new InvalidCastException(bufferVal + " is not a boolean. True/False");
+                throw new InvalidCastException(bufferVal.ToString() + " is not a boolean. True/False");
             }
             return res;
         }

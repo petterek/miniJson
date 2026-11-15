@@ -14,13 +14,14 @@ Supports string and stream input/output.
 - [Version 2.0.0](#version-200)
 - [Install](#install)
 - [Usage](#usage)
+- [Experimental source-generated deserialization](#experimental-source-generated-deserialization)
 - [Compatibility and limitations](#compatibility-and-limitations)
 - [Build and test](#build-and-test)
 - [Benchmarks](#benchmarks)
 
 ## Version 2.0.0
 
-**Breaking compatibility change:** the library now targets .NET 11 instead of
+**Breaking compatibility change:** the released 2.0.0 library targets .NET 11 instead of
 .NET Standard 2.0. Applications targeting older frameworks must stay on 1.4.0
 or upgrade to .NET 11.
 
@@ -36,7 +37,7 @@ not performance guarantees.
 
 ## Install
 
-Requires .NET 11. This release is distributed through
+The published 2.0.0 package requires .NET 11. This release is distributed through
 [GitHub Releases](https://github.com/petterek/miniJson/releases/tag/v2.0.0),
 not NuGet.org.
 
@@ -74,6 +75,107 @@ Stream overloads use the same known-type model and leave caller-owned streams
 open. `Parser.StringToObjects` accepts explicitly supplied positional types
 for heterogeneous arrays.
 
+## Experimental source-generated deserialization
+
+Available on `master` as unreleased development code, **not in the
+released 2.0.0 package**. This opt-in feature generates typed object construction,
+member assignments, and array parsing; it reuses the existing tokenizer and
+scalar readers. Serialization is unchanged.
+
+The development runtime library targets **.NET Standard 2.1**; .NET Framework
+does not support this target. The analyzer targets .NET Standard 2.0. Building
+this checkout still requires the .NET 11 SDK for its tests and benchmarks.
+Projects declaring records on .NET Standard 2.1 also need an
+`System.Runtime.CompilerServices.IsExternalInit` compatibility shim.
+
+Reference both projects from your application, adjusting the paths:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="../src/miniJson/miniJson.csproj" />
+  <ProjectReference Include="../src/miniJson.SourceGeneration/miniJson.SourceGeneration.csproj"
+                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+</ItemGroup>
+```
+
+Register known types on a top-level, non-generic partial class:
+
+```csharp
+using System.IO;
+using System.Text;
+using miniJson;
+
+const string json = "[{\"Name\":\"example\",\"Age\":42,\"Scores\":[1,2]}]";
+Person[] people = Parser.StringToObject(json, AppJsonContext.People);
+using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+Person[] streamedPeople = Parser.StringToObject(stream, AppJsonContext.People);
+
+[MiniJsonSerializable(typeof(Person[]), "People")]
+internal static partial class AppJsonContext { }
+
+public record Person(string Name, int Age, int[] Scores);
+```
+
+Passing a generated descriptor opts in; existing `typeof(Person[])` calls
+still use reflection. Generated readers support writable public fields and
+properties on classes with a public parameterless constructor, supported
+primitive types, and their one-dimensional arrays. Mutable records with
+`get; set;` properties also work.
+
+Immutable record classes are read into typed locals, then constructed once
+after the object is parsed. A unique public non-copy constructor must have
+parameters matching public fields/properties by name (ignoring case) and exact
+type. Read-only/init-only members must be constructor-bound; additional
+writable members are assigned only when present, preserving their initializers.
+Missing arguments use optional parameter defaults or `default(T)` otherwise.
+Explicit JSON null overrides an optional default where the existing type
+reader accepts null. Nested records, record arrays, and recursive record
+graphs use the same generated readers.
+
+**Unreleased behavior change:** JSON property and field names now match
+case-insensitively in both generated and reflection readers. The last matching
+value wins. Dictionary keys and serialized CLR member names are unchanged.
+Case-colliding schemas produce a generator fallback warning and throw
+`AmbiguousMatchException` when an ambiguous name is read.
+
+Unsupported members use existing reflection parsing; unsupported roots emit
+`MJG002` and a reflection-backed descriptor. Ambiguous/unmatched record
+constructors, unbound read-only/init-only members, required members, and
+record structs do not get generated readers. Reflection fallback still needs
+its existing constructor/type support; immutable records generally require
+a generated descriptor. Byte arrays retain their Base64 format.
+The generator is currently a project-reference experiment, not a packaged
+analyzer.
+
+### Experiment results
+
+Mean microseconds / allocated bytes per complete 100-element array operation,
+measured on 2026-11-15 with the .NET Standard 2.1 library running on .NET 11.
+All implementations use the same BenchmarkDotNet ShortRun:
+
+| Workload | Reflection miniJson | Generated miniJson | System.Text.Json | Newtonsoft.Json |
+| --- | ---: | ---: | ---: | ---: |
+| ASCII objects | 84.098 / 77,874 | 24.271 / 22,288 | 27.469 / 22,688 | 51.613 / 33,856 |
+| Unicode objects | 102.740 / 106,676 | 40.606 / 51,088 | 43.362 / 27,488 | 62.532 / 40,728 |
+| Exponent doubles | 8.103 / 5,872 | 6.508 / 3,088 | 7.646 / 3,016 | 15.649 / 15,200 |
+
+Generated object readers measured 3.46x / 2.53x faster than reflection and
+roughly matched System.Text.Json throughput on these workloads. Unicode
+allocations remain higher. The exponent row was refreshed after numeric
+optimization; its generated reader now measures roughly System.Text.Json
+throughput and about 2.40x faster than its previous 15.596 us result.
+These are warmed, shared-machine short runs, not performance guarantees.
+The object workloads use mutable classes, not immutable records.
+The original 24-case run and updated 8-case exponent run completed with
+setup-time value checks.
+
+Floating-point tokens now use a dedicated ASCII grammar scanner, combining
+token boundaries and validation in one pass for string input. Double conversion
+uses `Utf8Parser` through a fixed 64-byte stack buffer, with `double.Parse` for
+longer tokens or conversions the UTF-8 parser cannot handle. A separate
+conversion benchmark measured 7.134 us for char-span parsing versus 4.399 us
+including the ASCII stack-buffer copy, per 100 exponent tokens.
+
 ## Compatibility and limitations
 
 miniJson is a known-type parser, not an arbitrary dynamic JSON parser or a
@@ -84,8 +186,9 @@ does not prove full syntax validation or value preservation.
 
 Existing wire behavior is retained: `\n` becomes `Environment.NewLine`,
 string APIs replace unpaired UTF-16 surrogates, and stream output rejects them.
-Byte arrays use Base64, member-name matching is case-sensitive, and unknown
-object members are not assigned.
+Byte arrays use Base64 and unknown object members are not assigned.
+Released 2.0.0 matches member names case-sensitively; the unreleased code on master
+uses case-insensitive matching.
 
 ## Build and test
 
@@ -94,14 +197,17 @@ Requires the .NET 11 SDK.
 ```sh
 dotnet build miniJson.sln
 dotnet test test/test.vbproj
+dotnet test test.SourceGeneration/miniJson.SourceGeneration.Tests.csproj
 dotnet test test/test.vbproj --filter "FullyQualifiedName=test.TestParser.ParseSimpleObject"
 dotnet test test/test.vbproj -c Release --collect:"Code Coverage;Format=Cobertura"
 ```
 
-The library targets .NET 11. Building it also creates a NuGet package.
-The 163 unit-test cases currently cover 87.1% of library lines and 82.8% of
-library branches; these figures exclude the test assembly and external
-JSONTestSuite runs.
+The development library targets .NET Standard 2.1; tests and benchmarks target
+.NET 11. Building the library also creates a NuGet package.
+Both suites pass: 163 existing tests and 84 generator tests. Released-version
+coverage was 87.1% of library lines and 82.8% of library branches; these figures
+exclude test assemblies, the generator experiment, and external JSONTestSuite
+runs.
 
 ## Benchmarks
 
@@ -109,7 +215,7 @@ JSONTestSuite runs.
 dotnet run -c Release --project benchmarks/miniJson.Benchmarks.csproj -- --filter '*'
 ```
 
-### Latest deserialization results
+### Released 2.0.0 deserialization results
 
 Mean microseconds / managed bytes allocated per complete 100-element array
 operation, measured on 2026-11-14 with .NET 11:
@@ -120,7 +226,7 @@ operation, measured on 2026-11-14 with .NET 11:
 | Unicode objects | 109.457 / 109,876 | 44.576 / 27,488 | 64.318 / 40,728 |
 | Exponent doubles | 13.938 / 5,872 | 7.492 / 3,016 | 18.993 / 15,200 |
 
-miniJson remains approximately 3.09x / 2.46x / 1.86x slower than System.Text.Json
+Released 2.0.0 measured approximately 3.09x / 2.46x / 1.86x slower than System.Text.Json
 for these workloads. Full methodology and optimization history follow.
 
 ### Methodology

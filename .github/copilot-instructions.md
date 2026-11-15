@@ -2,7 +2,8 @@
 
 miniJson is a small C# JSON parser/writer with string and stream APIs, intentionally simple
 and not intended to cover every JSON use case (see `readme.md`). The library
-and its VB.NET test project both target `net11.0`.
+targets `netstandard2.1`; tests and benchmarks target `net11.0`.
+The source-generator analyzer targets `netstandard2.0`.
 The library has no external package references. Newtonsoft.Json is used in
 tests and benchmarks as a comparison serializer/deserializer.
 
@@ -14,6 +15,7 @@ Run from the repository root with the .NET 11 SDK:
 dotnet restore miniJson.sln
 dotnet build miniJson.sln
 dotnet test test/test.vbproj
+dotnet test test.SourceGeneration/miniJson.SourceGeneration.Tests.csproj
 
 # Coverage in Cobertura format using the test SDK's collector
 dotnet test test/test.vbproj -c Release --collect:"Code Coverage;Format=Cobertura"
@@ -37,6 +39,17 @@ through the VSTest runner.
 
 ## Architecture
 
+- The experimental `miniJson.SourceGeneration` analyzer registers known roots
+  with `MiniJsonSerializable` and emits `MiniJsonTypeInfo<T>` descriptors.
+  Passing a descriptor opts into typed deserialization via `MiniJsonReader`;
+  type-based overloads remain reflection-based. Reuse shared scalar/token
+  readers and preserve member-versus-root fallback dispatch. Unsupported
+  shapes fall back rather than changing existing wire behavior. The generator
+  and its C# tests are separate projects; serialization is not generated.
+  Immutable record classes use a unique public non-copy constructor bound
+  by case-insensitive member name and exact type. Stage values, finish parsing,
+  then call the constructor once; missing arguments use optional defaults or
+  `default(T)`. Unbound writable members retain initializers when absent.
 - `Parser` is the public deserialization entry point. String and stream
   overloads converge on `IReader`. String input uses indexed `ReadString`
   slices without a UTF-8 round trip or character queue; stream input uses
@@ -51,9 +64,10 @@ through the VSTest runner.
   arrays versus generic lists; `ObjectArrayBuilder` supports positional types
   supplied to `Parser.StringToObjects`.
 - Member parsing caches member types, parser choices, and compiled setters.
-  Per-type concurrent member dictionaries use `StringComparer.Ordinal` and
-  alternate span lookup so warmed, unescaped string-input names need no string
-  allocation. Discover and compile members lazily: unused read-only members
+  Per-type caches publish immutable sorted member snapshots and use
+  ordinal-ignore-case span binary search, avoiding warmed member-name
+  allocations without .NET-specific dictionary alternate lookup APIs.
+  Discover and compile members lazily: unused read-only members
   must not cause deserialization to fail.
   `SetterCreator` lives in `SetterCache.cs` and builds expression-tree
   delegates. Struct assignment must return and replace the boxed value;
@@ -78,9 +92,10 @@ through the VSTest runner.
   tracks EOF markers separately from real U+FFFF characters.
   `BufferString` scans through the next quote or backslash and leaves that
   boundary buffered; indexed input uses bulk span scanning.
-- JSON member names map directly and case-sensitively to public .NET fields
+- JSON member names map directly and case-insensitively to public .NET fields
   and properties. Unknown members are routed through `UnknownFieldParser`
-  rather than assigned. Serialization includes public instance fields and
+  rather than assigned. Reject case-colliding members as ambiguous; dictionary
+  keys and serialized member names do not change. Serialization includes public instance fields and
   properties, including inherited members, and honors `IgnoreDataMember`.
 - Collection interfaces `IEnumerable<T>` and `IList<T>` are materialized as
   `List<T>`. Non-generic lists are rejected. Dictionary parsing supports
@@ -96,6 +111,11 @@ through the VSTest runner.
   String parsing maps `\n` to `Environment.NewLine`.
   Floating-point/decimal tokens are validated against JSON number grammar
   before span parsing; do not broaden acceptance to .NET numeric syntax.
+  `JsonNumber.Scan` shares this grammar; indexed string reads combine token
+  scanning and validation while retaining final lookahead/EOF markers.
+  Double parsing copies validated ASCII tokens of at most 64 characters into
+  a stack buffer for `Utf8Parser`; longer tokens or failed UTF-8 conversions
+  use `double.Parse`. Preserve bit-exact rounding and negative zero.
 - String APIs use `Utf8Text.Normalize` to preserve null-input and unpaired
   surrogate replacement behavior without encoding valid UTF-16. Stream output
   retains its strict encoder (unpaired surrogates throw), and caller-owned

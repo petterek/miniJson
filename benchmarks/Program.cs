@@ -36,6 +36,7 @@ namespace miniJson.Benchmarks
             json = JsonSerializer.Serialize(items);
 
             Validate(MiniJsonDeserialize());
+            Validate(MiniJsonGeneratedDeserialize());
             Validate(SystemTextJsonDeserialize());
             Validate(NewtonsoftDeserialize());
             Validate(JsonSerializer.Deserialize<Payload[]>(MiniJsonSerialize()));
@@ -81,6 +82,11 @@ namespace miniJson.Benchmarks
 
         [Benchmark]
         [BenchmarkCategory("Deserialize")]
+        public Payload[] MiniJsonGeneratedDeserialize() =>
+            Parser.StringToObject(json, BenchmarkJsonContext.PayloadArray);
+
+        [Benchmark]
+        [BenchmarkCategory("Deserialize")]
         public Payload[]? SystemTextJsonDeserialize() =>
             JsonSerializer.Deserialize<Payload[]>(json);
 
@@ -121,6 +127,7 @@ namespace miniJson.Benchmarks
             json = "[" + string.Join(",", values.Select(value => value.ToString("E17", CultureInfo.InvariantCulture))) + "]";
 
             Validate(MiniJsonDeserialize());
+            Validate(MiniJsonGeneratedDeserialize());
             Validate(SystemTextJsonDeserialize());
             Validate(NewtonsoftDeserialize());
             Validate(JsonSerializer.Deserialize<double[]>(MiniJsonSerialize()));
@@ -152,6 +159,11 @@ namespace miniJson.Benchmarks
         [BenchmarkCategory("Deserialize")]
         public double[] MiniJsonDeserialize() =>
             (double[])Parser.StringToObject(json, typeof(double[]));
+
+        [Benchmark]
+        [BenchmarkCategory("Deserialize")]
+        public double[] MiniJsonGeneratedDeserialize() =>
+            Parser.StringToObject(json, BenchmarkJsonContext.DoubleArray);
 
         [Benchmark]
         [BenchmarkCategory("Deserialize")]
